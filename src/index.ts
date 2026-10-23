@@ -1,4 +1,5 @@
 import { HTML } from './html';
+import { regulation } from './reference';
 
 export interface Env {
   // 백엔드 Worker에 대한 Service Binding (권장: 같은 계정 내 Worker 간 직접 호출)
@@ -27,9 +28,10 @@ async function proxyToBackend(request: Request, env: Env, path: string): Promise
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'model': '@cf/moonshotai/kimi-k2.6',
+      'model': '@cf/qwen/qwen3-30b-a3b-fp8',
+      'system': 'Check the regulation carefully and give user guidance based on it: ' + regulation,
       'temperature': '0.1',
-      'top_p': '0.1',
+      'top_p': '0.7',
       'X-API-Key': env.BACKEND_API_KEY
     },
     body: await request.text()
