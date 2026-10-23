@@ -4,7 +4,8 @@ export const HTML = `<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#ffffff" />
-<title>EduFinHub AI</title>
+<title>Allways</title>
+<link rel="icon" type="image/svg+xml" href="/allways.svg" />
 <style>
   :root {
     color-scheme: light;
@@ -42,12 +43,15 @@ export const HTML = `<!doctype html>
     display: flex; align-items: center; justify-content: space-between;
     max-width: 860px; width: 100%; margin: 0 auto; padding: 14px 16px;
   }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
-  .dots { display: inline-flex; gap: 4px; }
-  .dots i { width: 10px; height: 10px; display: block; }
-  .dots i:nth-child(1) { background: var(--red); }
-  .dots i:nth-child(2) { background: var(--green); border-radius: 50%; }
-  .dots i:nth-child(3) { background: var(--blue); transform: rotate(45deg) scale(.85); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand img { height: 30px; width: auto; display: block; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .role-badge {
+    border: 2px solid var(--ink); background: var(--soft); padding: 6px 12px; border-radius: 999px;
+    font-size: .85rem; font-weight: 700; cursor: pointer; display: none;
+  }
+  .role-badge:hover { background: var(--ink); color: var(--bg); }
+  .app.has-role .role-badge { display: inline-block; }
   .new-chat {
     border: 2px solid var(--ink); background: var(--bg); padding: 6px 12px; border-radius: 999px;
     font-size: .85rem; font-weight: 700; cursor: pointer; visibility: hidden;
@@ -55,6 +59,25 @@ export const HTML = `<!doctype html>
   }
   .new-chat:hover { background: var(--ink); color: var(--bg); }
   .app.chatting .new-chat { visibility: visible; }
+
+  /* 역할 선택 화면 */
+  .picker { flex: 1; display: flex; align-items: center; overflow-y: auto; }
+  .picker-inner { max-width: 860px; width: 100%; margin: 0 auto; padding: 8px 16px 12vh; }
+  .picker h1 { margin: 0 0 10px; font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1.1; letter-spacing: -0.04em; font-weight: 900; }
+  .picker p { margin: 0 0 26px; color: var(--muted); }
+  .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .role {
+    text-align: left; border: 2px solid var(--ink); background: var(--bg); border-radius: 18px; padding: 20px;
+    cursor: pointer; transition: transform .12s, box-shadow .12s;
+  }
+  .role:hover, .role:focus-visible { transform: translate(-3px, -3px); outline: 0; }
+  .role:nth-child(1):hover, .role:nth-child(1):focus-visible { box-shadow: 6px 6px 0 var(--red); }
+  .role:nth-child(2):hover, .role:nth-child(2):focus-visible { box-shadow: 6px 6px 0 var(--green); }
+  .role:nth-child(3):hover, .role:nth-child(3):focus-visible { box-shadow: 6px 6px 0 var(--blue); }
+  .role strong { display: block; font-size: 1.2rem; margin-bottom: 6px; }
+  .role span { color: var(--muted); font-size: .9rem; line-height: 1.5; }
+  .app.has-role .picker { display: none; }
+  .app:not(.has-role) #thread, .app:not(.has-role) .composer-wrap { display: none; }
 
   /* 대화 영역 */
   #thread {
@@ -93,9 +116,8 @@ export const HTML = `<!doctype html>
   .msg.user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
   .msg.ai .bubble { background: var(--bg); border: 2px solid var(--ink); border-top-left-radius: 4px; box-shadow: 4px 4px 0 var(--green); }
   .msg.ai.error .bubble { border-color: var(--red); box-shadow: 4px 4px 0 var(--red); color: var(--red); font-weight: 600; }
-  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; margin-top: 2px; }
-  .avatar .dots { gap: 2px; }
-  .avatar .dots i { width: 5px; height: 5px; }
+  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink); background: var(--bg); display: grid; place-items: center; margin-top: 2px; overflow: hidden; }
+  .avatar img { width: 22px; height: 22px; object-fit: contain; display: block; }
   .meta { font-size: .75rem; color: var(--muted); margin-top: 8px; }
 
   .typing { display: inline-flex; gap: 6px; padding: 4px 0; }
@@ -145,21 +167,31 @@ export const HTML = `<!doctype html>
   <div class="stripe"><span></span><span></span><span></span></div>
 
   <header>
-    <div class="brand"><span class="dots"><i></i><i></i><i></i></span>EduFinHub</div>
-    <button class="new-chat" id="newChat" type="button">+ 새 대화</button>
+    <div class="brand"><img src="/allways.svg" alt="Allways" /></div>
+    <div class="header-actions">
+      <button class="new-chat" id="newChat" type="button">+ 새 대화</button>
+      <button class="role-badge" id="roleBadge" type="button" title="역할 변경"></button>
+    </div>
   </header>
+
+  <section class="picker">
+    <div class="picker-inner">
+      <h1>어떤 분이신가요?</h1>
+      <p>역할을 선택하면 그에 맞춰 Allways가 도와드려요.</p>
+      <div class="roles">
+        <button class="role" type="button" data-role="teacher"><strong>교사</strong><span>수업 자료, 지도안, 평가 문항 준비를 도와드려요.</span></button>
+        <button class="role" type="button" data-role="student"><strong>학생</strong><span>금융과 경제, 궁금한 것을 쉽게 설명해 드려요.</span></button>
+        <button class="role" type="button" data-role="office"><strong>교육청 관계자</strong><span>금융교육 정책, 운영 계획, 연수 기획을 지원해요.</span></button>
+      </div>
+    </div>
+  </section>
 
   <div id="thread">
     <div class="thread-inner" id="list">
       <section class="hero">
         <h1><span class="r">무엇이든</span> <span class="g">물어보세요</span><span class="b">.</span></h1>
-        <p>금융과 경제, 궁금한 것을 AI에게 바로 질문해 보세요.</p>
-        <div class="chips">
-          <button class="chip" type="button">복리란 무엇인가요?</button>
-          <button class="chip" type="button">사회초년생 예산 짜는 법</button>
-          <button class="chip" type="button">주식과 채권의 차이</button>
-          <button class="chip" type="button">신용점수를 올리려면?</button>
-        </div>
+        <p id="heroText"></p>
+        <div class="chips" id="chips"></div>
       </section>
     </div>
   </div>
@@ -179,7 +211,27 @@ export const HTML = `<!doctype html>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var app = $("app"), list = $("list"), thread = $("thread"), input = $("prompt"), send = $("send");
-  var SYSTEM = "You are a helpful assistant.";
+  var ROLES = {
+    teacher: {
+      label: "교사",
+      intro: "수업 준비부터 평가까지, 금융교육에 필요한 것을 물어보세요.",
+      system: "You are an assistant for school teachers in Korea who teach financial and economic education. Help with lesson plans, class materials, activities, and assessment items. Answer in Korean.",
+      chips: ["고등학생 대상 복리 수업 지도안", "금융 퀴즈 5문항 만들기", "모둠 활동 아이디어", "수행평가 루브릭 예시"]
+    },
+    student: {
+      label: "학생",
+      intro: "금융과 경제, 궁금한 것을 AI에게 바로 질문해 보세요.",
+      system: "You are a friendly tutor for Korean students learning about finance and economics. Explain clearly with simple examples suited to the student's level. Answer in Korean.",
+      chips: ["복리란 무엇인가요?", "용돈 예산 짜는 법", "주식과 채권의 차이", "신용점수를 올리려면?"]
+    },
+    office: {
+      label: "교육청 관계자",
+      intro: "금융교육 정책과 운영 계획 수립을 도와드려요.",
+      system: "You are an assistant for officials at Korean regional education offices. Help with financial education policy, school program planning, teacher training design, and performance indicators. Answer in Korean.",
+      chips: ["학교 금융교육 운영 계획서 초안", "교사 연수 프로그램 구성", "금융교육 성과 지표 설계", "최근 금융교육 정책 동향"]
+    }
+  };
+  var role = null;
   var busy = false;
 
   function autosize() {
@@ -193,7 +245,7 @@ export const HTML = `<!doctype html>
   function avatar() {
     var a = document.createElement("div");
     a.className = "avatar";
-    a.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+    a.innerHTML = '<img src="/allways.svg" alt="" />';
     return a;
   }
 
@@ -226,7 +278,7 @@ export const HTML = `<!doctype html>
       var res = await fetch("/api/worker-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, system: SYSTEM })
+        body: JSON.stringify({ prompt: text, system: role.system })
       });
       var data = await res.json().catch(function () { return null; });
       if (!res.ok || !data) {
@@ -263,18 +315,47 @@ export const HTML = `<!doctype html>
     ask(input.value.trim());
   });
 
-  Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (chip) {
-    chip.addEventListener("click", function () { ask(chip.textContent); });
+  function clearChat() {
+    Array.prototype.forEach.call(list.querySelectorAll(".msg"), function (m) { m.remove(); });
+    app.classList.remove("chatting");
+  }
+
+  function selectRole(key) {
+    role = ROLES[key];
+    $("roleBadge").textContent = role.label + " ▾";
+    $("heroText").textContent = role.intro;
+    var chips = $("chips");
+    chips.innerHTML = "";
+    role.chips.forEach(function (label) {
+      var chip = document.createElement("button");
+      chip.className = "chip";
+      chip.type = "button";
+      chip.textContent = label;
+      chip.addEventListener("click", function () { ask(label); });
+      chips.appendChild(chip);
+    });
+    clearChat();
+    app.classList.add("has-role");
+    input.focus();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".role"), function (btn) {
+    btn.addEventListener("click", function () { selectRole(btn.getAttribute("data-role")); });
+  });
+
+  // 역할 배지를 누르면 역할 선택 화면으로 돌아감
+  $("roleBadge").addEventListener("click", function () {
+    if (busy) return;
+    clearChat();
+    role = null;
+    app.classList.remove("has-role");
   });
 
   $("newChat").addEventListener("click", function () {
     if (busy) return;
-    Array.prototype.forEach.call(list.querySelectorAll(".msg"), function (m) { m.remove(); });
-    app.classList.remove("chatting");
+    clearChat();
     input.focus();
   });
-
-  input.focus();
 })();
 </script>
 </body>

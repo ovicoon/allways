@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-23",
 
+  // 정적 파일 (로고 등). public/ 에 있는 파일은 Worker 실행 없이 바로 제공됨 (예: /allways.svg)
+  "assets": { "directory": "./public/" },
+
   // 같은 계정의 Worker를 workers.dev URL로 fetch하면 Error 1042 가 나므로 Service Binding 사용
   // "remote": true → wrangler dev 에서도 로컬 시뮬레이션이 아닌 배포된 ai-api-hub 에 연결 (deploy 와 동일 동작)
   "services": [
