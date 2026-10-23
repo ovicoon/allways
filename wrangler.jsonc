@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edufinhub",
   "main": "src/index.ts",
-  "compatibility_date": "2026-10-23",
+  "compatibility_date": "2026-10-19",
 
   // 정적 파일 (로고 등). public/ 에 있는 파일은 Worker 실행 없이 바로 제공됨 (예: /allways.svg)
   "assets": { "directory": "./public/" },
