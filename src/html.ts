@@ -2,143 +2,279 @@ export const HTML = `<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#ffffff" />
+<title>EduFinHub AI</title>
 <style>
-  :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --fg:#1a1d21; --muted:#6b7280; --border:#d9dde3; --accent:#2563eb; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#0f1114; --card:#181b20; --fg:#e8eaed; --muted:#9aa0a8; --border:#2b3037; --accent:#4f8cff; }
+  :root {
+    color-scheme: light;
+    --red: #ff0000;
+    --green: #00ff00;
+    --blue: #0000ff;
+    --ink: #000000;
+    --muted: #5c5c5c;
+    --line: #e6e6e6;
+    --bg: #ffffff;
+    --soft: #f5f5f5;
   }
   * { box-sizing: border-box; }
-  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans KR", sans-serif; background:var(--bg); color:var(--fg); }
-  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 1.4rem; margin: 0 0 16px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
-  .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-  @media (max-width:600px){ .row { grid-template-columns: 1fr; } }
-  label { display:block; font-size:.8rem; color:var(--muted); margin:0 0 4px; }
-  input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:transparent; color:inherit; font:inherit; }
-  textarea { resize: vertical; min-height: 110px; }
-  .field { margin-bottom:12px; }
-  button { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:10px 18px; font:inherit; cursor:pointer; }
-  button:disabled { opacity:.6; cursor:wait; }
-  #out { white-space:pre-wrap; word-break:break-word; min-height:60px; }
-  .err { color:#dc2626; }
-  .meta { color:var(--muted); font-size:.8rem; margin-top:8px; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, textarea { font: inherit; color: inherit; }
+
+  /* 상단 RGB 띠 */
+  .stripe { height: 6px; display: flex; flex: none; }
+  .stripe span { flex: 1; }
+  .stripe span:nth-child(1) { background: var(--red); }
+  .stripe span:nth-child(2) { background: var(--green); }
+  .stripe span:nth-child(3) { background: var(--blue); }
+
+  .app { height: 100dvh; display: flex; flex-direction: column; }
+
+  header {
+    flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 860px; width: 100%; margin: 0 auto; padding: 14px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots i { width: 10px; height: 10px; display: block; }
+  .dots i:nth-child(1) { background: var(--red); }
+  .dots i:nth-child(2) { background: var(--green); border-radius: 50%; }
+  .dots i:nth-child(3) { background: var(--blue); transform: rotate(45deg) scale(.85); }
+  .new-chat {
+    border: 2px solid var(--ink); background: var(--bg); padding: 6px 12px; border-radius: 999px;
+    font-size: .85rem; font-weight: 700; cursor: pointer; visibility: hidden;
+    transition: background .15s, color .15s;
+  }
+  .new-chat:hover { background: var(--ink); color: var(--bg); }
+  .app.chatting .new-chat { visibility: visible; }
+
+  /* 대화 영역 */
+  #thread {
+    flex: 1; overflow-y: auto; overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
+  .thread-inner { max-width: 860px; margin: 0 auto; padding: 8px 16px 24px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* 첫 화면 */
+  .app:not(.chatting) #thread { display: flex; align-items: center; }
+  .app:not(.chatting) .thread-inner { width: 100%; }
+  .hero { padding: 0 0 8px; }
+  .app.chatting .hero { display: none; }
+  .hero h1 {
+    margin: 0 0 14px; font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.1; letter-spacing: -0.04em; font-weight: 900;
+  }
+  .hero h1 .r { color: var(--red); }
+  .hero h1 .b { color: var(--blue); }
+  .hero h1 .g { background: linear-gradient(transparent 62%, var(--green) 62%); }
+  .hero p { margin: 0 0 22px; color: var(--muted); font-size: 1rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 2px solid var(--ink); background: var(--bg); border-radius: 999px; padding: 8px 14px;
+    font-size: .9rem; cursor: pointer; transition: transform .12s, box-shadow .12s;
+  }
+  .chip:nth-child(3n+1):hover { box-shadow: 4px 4px 0 var(--red); }
+  .chip:nth-child(3n+2):hover { box-shadow: 4px 4px 0 var(--green); }
+  .chip:nth-child(3n+3):hover { box-shadow: 4px 4px 0 var(--blue); }
+  .chip:hover { transform: translate(-2px, -2px); }
+
+  /* 메시지 */
+  .msg { display: flex; gap: 10px; max-width: 100%; animation: pop .22s ease-out; }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .msg.user { justify-content: flex-end; }
+  .bubble { padding: 12px 16px; border-radius: 18px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; max-width: min(640px, 85%); }
+  .msg.user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.ai .bubble { background: var(--bg); border: 2px solid var(--ink); border-top-left-radius: 4px; box-shadow: 4px 4px 0 var(--green); }
+  .msg.ai.error .bubble { border-color: var(--red); box-shadow: 4px 4px 0 var(--red); color: var(--red); font-weight: 600; }
+  .avatar { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; margin-top: 2px; }
+  .avatar .dots { gap: 2px; }
+  .avatar .dots i { width: 5px; height: 5px; }
+  .meta { font-size: .75rem; color: var(--muted); margin-top: 8px; }
+
+  .typing { display: inline-flex; gap: 6px; padding: 4px 0; }
+  .typing i { width: 8px; height: 8px; border-radius: 50%; animation: bounce 1s infinite ease-in-out; }
+  .typing i:nth-child(1) { background: var(--red); }
+  .typing i:nth-child(2) { background: var(--green); animation-delay: .15s; }
+  .typing i:nth-child(3) { background: var(--blue); animation-delay: .3s; }
+  @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-7px); } }
+
+  /* 입력창 */
+  .composer-wrap { flex: none; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--bg); }
+  .app:not(.chatting) .composer-wrap { padding-bottom: 12vh; }
+  .composer {
+    max-width: 828px; margin: 0 auto;
+    display: flex; align-items: flex-end; gap: 8px;
+    border: 2px solid var(--ink); border-radius: 22px; padding: 8px 8px 8px 18px; background: var(--bg);
+    box-shadow: 6px 6px 0 var(--blue);
+    transition: box-shadow .15s;
+  }
+  .composer:focus-within { box-shadow: 6px 6px 0 var(--red); }
+  .composer textarea {
+    flex: 1; border: 0; outline: 0; resize: none; background: transparent;
+    font-size: 1rem; line-height: 1.5; padding: 8px 0; max-height: 200px; min-height: 24px;
+  }
+  .composer textarea::placeholder { color: #9a9a9a; }
+  .send {
+    flex: none; width: 42px; height: 42px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--red); color: #fff; display: grid; place-items: center;
+    transition: transform .12s, background .15s;
+  }
+  .send:hover:not(:disabled) { transform: scale(1.06); }
+  .send:disabled { background: #d0d0d0; cursor: not-allowed; }
+  .send svg { width: 20px; height: 20px; }
+  .hint { max-width: 828px; margin: 10px auto 0; font-size: .75rem; color: var(--muted); text-align: center; }
+
+  @media (max-width: 600px) {
+    .bubble { max-width: 88%; }
+    .avatar { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>AI Playground</h1>
+<div class="app" id="app">
+  <div class="stripe"><span></span><span></span><span></span></div>
 
-  <form id="form" class="card">
-    <div class="row">
-      <div class="field">
-        <label for="provider">Provider</label>
-        <select id="provider">
-          <option value="gemini">Google Gemini</option>
-          <option value="worker-ai">Cloudflare Workers AI</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="model">Model (비워두면 기본값)</label>
-        <input id="model" placeholder="gemini-3.8-flash" />
-      </div>
+  <header>
+    <div class="brand"><span class="dots"><i></i><i></i><i></i></span>EduFinHub</div>
+    <button class="new-chat" id="newChat" type="button">+ 새 대화</button>
+  </header>
+
+  <div id="thread">
+    <div class="thread-inner" id="list">
+      <section class="hero">
+        <h1><span class="r">무엇이든</span> <span class="g">물어보세요</span><span class="b">.</span></h1>
+        <p>금융과 경제, 궁금한 것을 AI에게 바로 질문해 보세요.</p>
+        <div class="chips">
+          <button class="chip" type="button">복리란 무엇인가요?</button>
+          <button class="chip" type="button">사회초년생 예산 짜는 법</button>
+          <button class="chip" type="button">주식과 채권의 차이</button>
+          <button class="chip" type="button">신용점수를 올리려면?</button>
+        </div>
+      </section>
     </div>
+  </div>
 
-    <div class="field">
-      <label for="system">System 프롬프트</label>
-      <input id="system" value="You are a helpful assistant." />
-    </div>
-
-    <div class="row">
-      <div class="field">
-        <label for="temperature">Temperature (선택)</label>
-        <input id="temperature" type="number" step="0.1" min="0" max="2" placeholder="예: 0.7" />
-      </div>
-      <div class="field">
-        <label for="top_p">Top-p (선택)</label>
-        <input id="top_p" type="number" step="0.05" min="0" max="1" placeholder="예: 0.95" />
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="prompt">프롬프트</label>
-      <textarea id="prompt" placeholder="질문을 입력하세요. (Ctrl/⌘ + Enter 로 전송)"></textarea>
-    </div>
-
-    <button id="send" type="submit">보내기</button>
-  </form>
-
-  <section class="card">
-    <label>응답</label>
-    <div id="out">아직 응답이 없습니다.</div>
-    <div id="meta" class="meta"></div>
-  </section>
-</main>
+  <div class="composer-wrap">
+    <form class="composer" id="form">
+      <textarea id="prompt" rows="1" placeholder="메시지를 입력하세요" aria-label="메시지"></textarea>
+      <button class="send" id="send" type="submit" aria-label="보내기" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+      </button>
+    </form>
+    <div class="hint">Enter 전송 · Shift + Enter 줄바꿈</div>
+  </div>
+</div>
 
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var placeholders = { "gemini": "gemini-3.8-flash", "worker-ai": "@cf/meta/llama-3.2-1b-instruct" };
+  var app = $("app"), list = $("list"), thread = $("thread"), input = $("prompt"), send = $("send");
+  var SYSTEM = "You are a helpful assistant.";
+  var busy = false;
 
-  $("provider").addEventListener("change", function () {
-    $("model").placeholder = placeholders[$("provider").value];
-  });
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 200) + "px";
+    send.disabled = busy || !input.value.trim();
+  }
 
-  $("prompt").addEventListener("keydown", function (e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      $("form").requestSubmit();
-    }
-  });
+  function scrollDown() { thread.scrollTop = thread.scrollHeight; }
 
-  $("form").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    var provider = $("provider").value;
-    var body = { prompt: $("prompt").value.trim(), system: $("system").value };
-    if (!body.prompt) return;
-    if ($("model").value.trim()) body.model = $("model").value.trim();
-    if ($("temperature").value !== "") body.temperature = Number($("temperature").value);
-    if ($("top_p").value !== "") body.top_p = Number($("top_p").value);
+  function avatar() {
+    var a = document.createElement("div");
+    a.className = "avatar";
+    a.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+    return a;
+  }
 
-    var out = $("out"), meta = $("meta"), btn = $("send");
-    btn.disabled = true;
-    out.className = "";
-    out.textContent = "생성 중...";
-    meta.textContent = "";
+  function addMessage(role, text) {
+    var row = document.createElement("div");
+    row.className = "msg " + role;
+    var bubble = document.createElement("div");
+    bubble.className = "bubble";
+    if (text != null) bubble.textContent = text;
+    if (role === "ai") row.appendChild(avatar());
+    row.appendChild(bubble);
+    list.appendChild(row);
+    scrollDown();
+    return { row: row, bubble: bubble };
+  }
+
+  async function ask(text) {
+    if (busy || !text) return;
+    busy = true;
+    app.classList.add("chatting");
+    addMessage("user", text);
+    input.value = "";
+    autosize();
+
+    var ai = addMessage("ai");
+    ai.bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
     var started = performance.now();
 
     try {
-      var res = await fetch("/api/" + provider, {
+      var res = await fetch("/api/worker-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ prompt: text, system: SYSTEM })
       });
       var data = await res.json().catch(function () { return null; });
       if (!res.ok || !data) {
         throw new Error((data && data.error) || ("요청 실패 (" + res.status + ")"));
       }
-
-      var text;
-      if (provider === "gemini") {
-        text = data.completion;
-        if (data.usage) {
-          meta.textContent = "model: " + data.model + " · tokens: " + (data.usage.totalTokenCount || "?");
-        }
-      } else {
-        text = data.response != null ? data.response : JSON.stringify(data, null, 2);
-      }
-      out.textContent = text || "(빈 응답)";
-      var secs = ((performance.now() - started) / 1000).toFixed(2);
-      meta.textContent = (meta.textContent ? meta.textContent + " · " : "") + secs + "s";
+      var reply = data.response != null ? data.response : JSON.stringify(data, null, 2);
+      ai.bubble.textContent = reply || "(빈 응답)";
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = ((performance.now() - started) / 1000).toFixed(1) + "s";
+      ai.bubble.appendChild(meta);
     } catch (err) {
-      out.className = "err";
-      out.textContent = "오류: " + err.message;
+      ai.row.classList.add("error");
+      ai.bubble.textContent = "오류: " + err.message;
     } finally {
-      btn.disabled = false;
+      busy = false;
+      autosize();
+      scrollDown();
+      input.focus();
+    }
+  }
+
+  input.addEventListener("input", autosize);
+  input.addEventListener("keydown", function (e) {
+    // 한글 IME 조합 중 Enter 는 무시
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+      e.preventDefault();
+      $("form").requestSubmit();
     }
   });
+
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    ask(input.value.trim());
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (chip) {
+    chip.addEventListener("click", function () { ask(chip.textContent); });
+  });
+
+  $("newChat").addEventListener("click", function () {
+    if (busy) return;
+    Array.prototype.forEach.call(list.querySelectorAll(".msg"), function (m) { m.remove(); });
+    app.classList.remove("chatting");
+    input.focus();
+  });
+
+  input.focus();
 })();
 </script>
 </body>

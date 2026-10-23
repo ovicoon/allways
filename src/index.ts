@@ -9,7 +9,7 @@ export interface Env {
   BACKEND_API_KEY: string;
 }
 
-const ALLOWED_PATHS = new Set(['/api/gemini', '/api/worker-ai']);
+const ALLOWED_PATHS = new Set(['/api/worker-ai']);
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
