@@ -24,17 +24,24 @@ async function proxyToBackend(request: Request, env: Env, path: string): Promise
     return json({ error: 'Server misconfigured: BACKEND_API_KEY is not set' }, 500);
   }
 
+  const clientBody: any = await request.json().catch(() => ({}));
+
+  // 헤더에는 줄바꿈·한글을 넣을 수 없으므로 모델 설정과 교칙 전문은 body로 전달
   const init: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'model': '@cf/qwen/qwen3-30b-a3b-fp8',
-      'system': 'Check the regulation carefully and give user guidance based on it: ' + regulation,
-      'temperature': '0.1',
-      'top_p': '0.7',
       'X-API-Key': env.BACKEND_API_KEY
     },
-    body: await request.text()
+    body: JSON.stringify({
+      prompt: clientBody.prompt ?? clientBody.question,
+      model: '@cf/qwen/qwen3-30b-a3b-fp8',
+      system: [clientBody.system, 'Check the regulation carefully and give user guidance based on it:', regulation]
+        .filter(Boolean)
+        .join('\n\n'),
+      temperature: 0.1,
+      top_p: 0.7
+    })
   };
 
   if (env.BACKEND) {
