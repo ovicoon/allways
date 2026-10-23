@@ -42,7 +42,7 @@ export const HTML = `<!doctype html>
       </div>
       <div class="field">
         <label for="model">Model (비워두면 기본값)</label>
-        <input id="model" placeholder="gemini-2.5-flash" />
+        <input id="model" placeholder="gemini-3.8-flash" />
       </div>
     </div>
 
@@ -80,7 +80,7 @@ export const HTML = `<!doctype html>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var placeholders = { "gemini": "gemini-2.5-flash", "worker-ai": "@cf/meta/llama-3.2-1b-instruct" };
+  var placeholders = { "gemini": "gemini-3.8-flash", "worker-ai": "@cf/meta/llama-3.2-1b-instruct" };
 
   $("provider").addEventListener("change", function () {
     $("model").placeholder = placeholders[$("provider").value];
