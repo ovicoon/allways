@@ -29,6 +29,7 @@ async function proxyToBackend(request: Request, env: Env, path: string): Promise
       'Content-Type': 'application/json',
       'model': '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
       'temperature': '0.1',
+      'top_p': '0.1',
       'X-API-Key': env.BACKEND_API_KEY
     },
     body: await request.text()
