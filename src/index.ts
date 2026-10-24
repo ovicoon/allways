@@ -1,5 +1,6 @@
 import { HTML } from './html';
-import { regulation } from './reference';
+import { REGULATION } from './reference';
+import { MAIN_MODEL } from './constant';
 
 export interface Env {
   // 백엔드 Worker에 대한 Service Binding (권장: 같은 계정 내 Worker 간 직접 호출)
@@ -19,33 +20,54 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-async function proxyToBackend(request: Request, env: Env, path: string): Promise<Response> {
+interface ProxyOptions {
+  temperature?: number;
+  top_p?: number;
+  instruction?: string;
+  useClientbody?: boolean;
+}
+
+async function proxyToBackend(
+  request: Request,
+  env: Env,
+  path: string,
+  model: string,
+  options: ProxyOptions = {} // 옵션 객체 하나로 전부 관리
+): Promise<Response> {
   if (!env.BACKEND_API_KEY) {
     return json({ error: 'Server misconfigured: BACKEND_API_KEY is not set' }, 500);
   }
 
   const clientBody: any = await request.json().catch(() => ({}));
 
-  // 헤더에는 줄바꿈·한글을 넣을 수 없으므로 모델 설정과 교칙 전문은 body로 전달
+  const useClientbody = options.useClientbody ?? true;
+
+  const systemPrompts = [
+    options.instruction,
+    useClientbody ? clientBody.system : undefined,
+    REGULATION
+  ].filter(Boolean);
+  
+  // 전송할 페이로드 구성
+  const payload: Record<string, any> = {
+    prompt: clientBody.prompt ?? clientBody.question,
+    model: model,
+  };
+
+  if (systemPrompts.length > 0) {
+    payload.system = systemPrompts.join('\n\n');
+  }
+
   const init: RequestInit = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-API-Key': env.BACKEND_API_KEY
     },
-    body: JSON.stringify({
-      prompt: clientBody.prompt ?? clientBody.question,
-      model: '@cf/qwen/qwen3-30b-a3b-fp8',
-      system: [clientBody.system, 'Check the regulation carefully and give user guidance based on it:', regulation]
-        .filter(Boolean)
-        .join('\n\n'),
-      temperature: 0.1,
-      top_p: 0.7
-    })
+    body: JSON.stringify(payload)
   };
 
   if (env.BACKEND) {
-    // Service Binding: 호스트명은 의미 없고 경로만 전달됨
     return env.BACKEND.fetch(`https://backend${path}`, init);
   }
   if (env.BACKEND_URL) {
@@ -79,7 +101,7 @@ export default {
         return json({ error: 'Method not allowed. Use POST method.' }, 405);
       }
       try {
-        return await proxyToBackend(request, env, path);
+        return await proxyToBackend(request, env, path, MAIN_MODEL);
       } catch (error: any) {
         return json({ error: error?.message || 'Upstream request failed' }, 502);
       }

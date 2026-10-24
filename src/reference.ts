@@ -1,5 +1,5 @@
 // prompts.ts
-export const regulation = `
+export const REGULATION = `
 - 1 -
 학교 생활 규정
 문 수 중 학 교
