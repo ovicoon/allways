@@ -1071,9 +1071,7 @@ export const HTML = `<!doctype html>
       var EXECUTE_MARKER = ">>>EXECUTE SQL:";
       var ACTION_LABELS = {
         submit: "민원 접수",
-        answer: "민원 답변 등록",
-        flag: "부적절 판정",
-        unflag: "부적절 판정 되돌리기"
+        answer: "민원 답변 등록"
       };
 
       var role = null;
