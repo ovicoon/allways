@@ -33,12 +33,20 @@ interface ComplaintRow {
   created_at: string;
 }
 
-// D1 에서 기존 민원과 답변을 읽어 instruction 에 붙일 텍스트로 만든다.
-async function loadComplaints(env: Env): Promise<string> {
-  const { results } = await env.DB
-    .prepare('SELECT id, content, answer, inappropriate, created_at FROM complaints ORDER BY created_at DESC LIMIT ?')
-    .bind(COMPLAINT_LIMIT)
-    .all<ComplaintRow>();
+const COMPLAINTS_QUERY = 'SELECT id, content, answer, inappropriate, created_at FROM complaints ORDER BY created_at DESC LIMIT ?';
+
+// D1 에서 기존 민원과 답변을 읽는다. 프론트엔드에서 불러온 데이터를 그대로 보여줄 수 있도록 쿼리와 행도 함께 돌려준다.
+async function loadComplaints(env: Env): Promise<{ text: string; query: string; rows: ComplaintRow[] }> {
+  const { results } = await env.DB.prepare(COMPLAINTS_QUERY).bind(COMPLAINT_LIMIT).all<ComplaintRow>();
+  return {
+    text: formatComplaints(results),
+    query: COMPLAINTS_QUERY.replace('?', String(COMPLAINT_LIMIT)),
+    rows: results
+  };
+}
+
+// 기존 민원과 답변을 instruction 에 붙일 텍스트로 만든다.
+function formatComplaints(results: ComplaintRow[]): string {
   if (results.length === 0) return '[기존 민원 목록]\n(접수된 민원 없음)';
   const list = results
     .map((row) =>
@@ -150,6 +158,65 @@ async function executeUnflag(env: Env, query: string): Promise<boolean> {
   return result.meta.changes > 0;
 }
 
+// 사용자가 버튼으로 실행 여부를 고르는 작업 종류
+type ActionKind = 'submit' | 'answer' | 'flag' | 'unflag';
+
+// 역할에 따라 허용된 형식인지 보고 작업 종류를 정한다. 허용되지 않으면 undefined.
+// 학교 관련자는 답변 등록·부적절 판정·판정 되돌리기(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
+function classifyQuery(query: string, isAdmin: boolean): ActionKind | undefined {
+  if (!isAdmin) return ALLOWED_INSERT.test(query) ? 'submit' : undefined;
+  if (ALLOWED_UPDATE.test(query)) return 'answer';
+  if (ALLOWED_FLAG.test(query)) return 'flag';
+  if (ALLOWED_UNFLAG.test(query)) return 'unflag';
+  return undefined;
+}
+
+const EXECUTORS: Record<ActionKind, (env: Env, query: string) => Promise<boolean>> = {
+  submit: executeComplaint,
+  answer: executeAnswer,
+  flag: executeFlag,
+  unflag: executeUnflag
+};
+
+// 모델이 제안한 쿼리에 서명한다. /api/execute 는 이 서명이 있는 쿼리만 실행하므로,
+// 클라이언트가 모델을 거치지 않고 임의의 민원을 직접 접수/답변할 수 없다.
+async function signAction(env: Env, role: string, query: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(`allways-action:${env.BACKEND_API_KEY}`),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${role}\n${query}`));
+  return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 길이가 같을 때 끝까지 비교해 서명 비교 시간으로 정보가 새지 않게 한다
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// 사용자가 "실행" 버튼을 눌렀을 때 서명을 확인하고 쿼리를 실행한다.
+async function handleExecute(request: Request, env: Env): Promise<Response> {
+  if (!env.BACKEND_API_KEY) {
+    return json({ error: 'Server misconfigured: BACKEND_API_KEY is not set' }, 500);
+  }
+  const body: any = await request.json().catch(() => ({}));
+  const query = typeof body.query === 'string' ? body.query : '';
+  const token = typeof body.token === 'string' ? body.token : '';
+  const role = body.role === ANSWER_ROLE ? ANSWER_ROLE : 'other';
+  const kind = classifyQuery(query, role === ANSWER_ROLE);
+  if (!kind || !safeEqual(token, await signAction(env, role, query))) {
+    return json({ error: '실행할 수 없는 작업입니다.' }, 400);
+  }
+  const executed = await EXECUTORS[kind](env, query);
+  return json({ kind, executed });
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -158,7 +225,7 @@ interface ChatMessage {
 // 프론트엔드가 보낸 이전 대화를 모델에 넘길 수 있는 형태로 정리한다.
 // qwen3 와 gpt-oss 모두 messages 의 content 는 일반 문자열이어야 하므로 모델별 부가 정보는 제거한다:
 // - qwen3 의 <think>...</think> 블록 (이전 턴의 reasoning 을 다시 넣으면 안 됨)
-// - >>>EXECUTE SQL: 표시 (다시 넣으면 같은 민원을 또 접수/답변할 수 있음)
+// - >>>EXECUTE SQL: 표시 (모델이 이전 표시를 그대로 다시 내놓지 않도록. 실행 여부는 프론트엔드가 본문 뒤에 적어 보낸다)
 function sanitizeHistory(raw: unknown, limit: number): ChatMessage[] {
   if (!Array.isArray(raw)) return [];
   const messages = raw
@@ -284,6 +351,18 @@ export default {
       });
     }
 
+    // 사용자가 승인한 민원 작업 실행
+    if (path === '/api/execute') {
+      if (request.method !== 'POST') {
+        return json({ error: 'Method not allowed. Use POST method.' }, 405);
+      }
+      try {
+        return await handleExecute(request, env);
+      } catch (error: any) {
+        return json({ error: error?.message || 'Execute failed' }, 500);
+      }
+    }
+
     // API 프록시 (API 키는 서버 측에서만 주입)
     if (ALLOWED_PATHS.has(path)) {
       if (request.method !== 'POST') {
@@ -300,12 +379,14 @@ export default {
         const isAdmin = clientBody.role === ANSWER_ROLE;
         const keys = await parseSkillKeys(retrieved);
         const hasComplaints = keys.includes('COMPLAINTS');
+        let loaded: Awaited<ReturnType<typeof loadComplaints>> | undefined;
         const skills = await Promise.all(
           keys.map(async (key) => {
             // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
             // 학교 관련자는 민원 접수 대신 답변 등록용 지침을 사용
             if (key === 'COMPLAINTS') {
-              return `${isAdmin ? COMPLAINTS_ADMIN : SKILLS[key].content}\n${await loadComplaints(env)}`;
+              loaded = await loadComplaints(env);
+              return `${isAdmin ? COMPLAINTS_ADMIN : SKILLS[key].content}\n${loaded.text}`;
             }
             return SKILLS[key].content;
           })
@@ -326,18 +407,17 @@ export default {
           return json({ error: truncated ? 'Model response truncated (max_tokens exceeded)' : 'Empty model response' }, 502);
         }
         data.response = answer;
-        // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인해 실행한다 (표시는 프론트엔드에서 숨김)
+        // 답변에 쓰려고 D1 에서 불러온 데이터 (프론트엔드에서 펼쳐 볼 수 있게 표시)
+        if (loaded) {
+          data.d1 = { table: 'complaints', query: loaded.query, rows: loaded.rows };
+        }
+        // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인한다. 바로 실행하지 않고,
+        // 허용된 형식이면 서명을 붙여 돌려주고 사용자가 버튼으로 실행 여부를 고른다 (/api/execute)
         if (!hasComplaints) return json(data);
         const query = extractQuery(answer);
-        if (query) {
-          // 학교 관련자는 답변 등록·부적절 판정·판정 되돌리기(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
-          if (isAdmin) {
-            data.complaint_answered = await executeAnswer(env, query);
-            data.complaint_flagged = await executeFlag(env, query);
-            data.complaint_unflagged = await executeUnflag(env, query);
-          } else {
-            data.complaint_submitted = await executeComplaint(env, query);
-          }
+        const kind = query ? classifyQuery(query, isAdmin) : undefined;
+        if (query && kind) {
+          data.action = { kind, query, token: await signAction(env, isAdmin ? ANSWER_ROLE : 'other', query) };
         }
         return json(data);
       } catch (error: any) {

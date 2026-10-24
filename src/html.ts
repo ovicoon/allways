@@ -514,6 +514,146 @@ export const HTML = `<!doctype html>
       border-top: 1px solid var(--border);
     }
 
+    /* 답변에 쓰려고 D1 에서 불러온 데이터. 누르면 실제 데이터를 펼쳐 본다 */
+
+    .loaded {
+      margin-bottom: 10px;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: normal;
+    }
+
+    .loaded summary {
+      display: inline-block;
+      cursor: pointer;
+      list-style: none;
+      transition: color 150ms ease;
+    }
+
+    .loaded summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .loaded summary::before {
+      content: "▸ ";
+    }
+
+    .loaded[open] summary::before {
+      content: "▾ ";
+    }
+
+    .loaded summary:hover {
+      color: var(--text);
+    }
+
+    .loaded-query,
+    .loaded-data {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .loaded-data {
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    /* 모델이 제안한 >>>EXECUTE SQL: 작업. 사용자가 버튼으로 실행 여부를 고른다 */
+
+    .action {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      background: var(--surface);
+      line-height: 1.6;
+      white-space: normal;
+    }
+
+    .action-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .action-marker {
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: var(--text);
+      color: #000000;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-weight: 700;
+    }
+
+    .action-kind {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .action-query {
+      margin: 10px 0 0;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .action-buttons button {
+      padding: 6px 16px;
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .action-buttons button:hover:not(:disabled) {
+      background: var(--surface-hover);
+    }
+
+    .action-buttons .action-run {
+      border-color: var(--text);
+      background: var(--text);
+      color: #000000;
+      font-weight: 600;
+    }
+
+    .action-buttons .action-run:hover:not(:disabled) {
+      background: #d0d0d0;
+    }
+
+    .action-buttons button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .action-status {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .action-status:empty {
+      display: none;
+    }
+
     .meta {
       margin-top: 12px;
       color: var(--subtle);
@@ -927,6 +1067,15 @@ export const HTML = `<!doctype html>
       var LOOK_REACH_PX = 320;
       var lookFrame = null;
 
+      // 모델이 민원 작업을 제안할 때 답변 끝에 붙이는 표시와, 서버가 알려주는 작업 종류별 이름
+      var EXECUTE_MARKER = ">>>EXECUTE SQL:";
+      var ACTION_LABELS = {
+        submit: "민원 접수",
+        answer: "민원 답변 등록",
+        flag: "부적절 판정",
+        unflag: "부적절 판정 되돌리기"
+      };
+
       var role = null;
       var busy = false;
       // 현재 대화의 이전 질문/답변. 매 요청에 함께 보내 모델이 맥락을 기억하게 한다 (새 대화/역할 변경 시 초기화)
@@ -1108,6 +1257,156 @@ export const HTML = `<!doctype html>
         }
       }
 
+      // 답변에 쓰려고 D1 에서 불러온 데이터를 작게 알리고, 누르면 쿼리와 불러온 행을 그대로 보여준다
+      function renderLoaded(d1) {
+        var rows = Array.isArray(d1.rows) ? d1.rows : [];
+
+        var details = document.createElement("details");
+        details.className = "loaded";
+
+        var summary = document.createElement("summary");
+        summary.textContent =
+          "D1 " + d1.table + " 테이블에서 데이터 " + rows.length + "건을 불러왔습니다";
+        details.appendChild(summary);
+
+        var queryEl = document.createElement("div");
+        queryEl.className = "loaded-query";
+        queryEl.textContent = d1.query;
+        details.appendChild(queryEl);
+
+        var dataEl = document.createElement("div");
+        dataEl.className = "loaded-data";
+        dataEl.textContent = JSON.stringify(rows, null, 2);
+        details.appendChild(dataEl);
+
+        details.addEventListener("toggle", function () {
+          if (details.open) {
+            details.scrollIntoView({ block: "nearest" });
+          }
+        });
+
+        return details;
+      }
+
+      // 모델이 제안한 작업 카드. 서버가 허용된 형식으로 확인해 서명(action.token)을 준 경우에만 실행 버튼을 보여준다
+      function renderAction(query, action, selectedRole, turn) {
+        var body = turn ? turn.content : "";
+        var label = action ? ACTION_LABELS[action.kind] : "실행할 수 없는 작업";
+
+        // 모델이 다음 질문에서 실행 여부를 알 수 있도록 대화 기록의 답변 뒤에 적어 둔다
+        function note(state) {
+          if (turn) {
+            turn.content = (body ? body + "\\n\\n" : "") + "[제안한 작업: " + label + " — " + state + "]";
+          }
+        }
+
+        var box = document.createElement("div");
+        box.className = "action";
+
+        var head = document.createElement("div");
+        head.className = "action-head";
+
+        var markerEl = document.createElement("span");
+        markerEl.className = "action-marker";
+        markerEl.textContent = EXECUTE_MARKER;
+
+        var kindEl = document.createElement("span");
+        kindEl.className = "action-kind";
+        kindEl.textContent = label;
+
+        head.appendChild(markerEl);
+        head.appendChild(kindEl);
+        box.appendChild(head);
+
+        var queryEl = document.createElement("div");
+        queryEl.className = "action-query";
+        queryEl.textContent = query;
+        box.appendChild(queryEl);
+
+        var status = document.createElement("div");
+        status.className = "action-status";
+
+        if (!action) {
+          status.textContent = "허용되지 않은 형식이라 실행할 수 없습니다.";
+          box.appendChild(status);
+          note("허용되지 않은 형식이라 실행되지 않음");
+          return box;
+        }
+
+        note("사용자가 아직 실행 여부를 고르지 않음");
+
+        var buttons = document.createElement("div");
+        buttons.className = "action-buttons";
+
+        var run = document.createElement("button");
+        run.type = "button";
+        run.className = "action-run";
+        run.textContent = "실행";
+
+        var cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = "실행하지 않음";
+
+        buttons.appendChild(run);
+        buttons.appendChild(cancel);
+        box.appendChild(buttons);
+        box.appendChild(status);
+
+        run.addEventListener("click", async function () {
+          run.disabled = true;
+          cancel.disabled = true;
+          status.textContent = "실행 중...";
+
+          try {
+            var res = await fetch("/api/execute", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                query: action.query,
+                token: action.token,
+                role: selectedRole.key
+              })
+            });
+
+            var result = await res.json().catch(function () {
+              return null;
+            });
+
+            if (!res.ok || !result) {
+              throw new Error(
+                (result && result.error) ||
+                ("요청 실패 (" + res.status + ")")
+              );
+            }
+
+            if (result.executed) {
+              buttons.remove();
+              status.textContent = label + " 완료";
+              note("사용자가 실행함");
+            } else {
+              buttons.remove();
+              status.textContent = "실행했지만 반영된 내용이 없습니다. (민원 번호나 상태를 확인해 주세요)";
+              note("사용자가 실행했지만 반영된 내용 없음");
+            }
+          } catch (err) {
+            run.disabled = false;
+            cancel.disabled = false;
+            status.textContent =
+              "실행하지 못했습니다. " + (err.message || "잠시 후 다시 시도해 주세요.");
+          }
+        });
+
+        cancel.addEventListener("click", function () {
+          buttons.remove();
+          status.textContent = "실행하지 않았습니다.";
+          note("사용자가 실행하지 않음");
+        });
+
+        return box;
+      }
+
       async function ask(rawText) {
         var text = String(rawText || "").trim();
 
@@ -1172,33 +1471,38 @@ export const HTML = `<!doctype html>
               ? String(data.response)
               : JSON.stringify(data, null, 2);
 
-          // 민원 접수용 >>>EXECUTE SQL: 표시는 답변 맨 끝에 오므로, 표시부터 끝까지 잘라낸다
-          var marker = reply.lastIndexOf(">>>EXECUTE SQL:");
+          // >>>EXECUTE SQL: 표시는 답변 맨 끝에 오므로, 본문과 표시를 나눠 표시는 따로 강조해 보여준다
+          var marker = reply.lastIndexOf(EXECUTE_MARKER);
+          var query = null;
           if (marker !== -1) {
+            query = reply.slice(marker + EXECUTE_MARKER.length).trim();
             reply = reply.slice(0, marker).trim();
           }
 
           if (reply) {
             renderMarkdown(ai.bubble, reply);
-          } else {
+          } else if (!query) {
             ai.bubble.textContent = "(빈 응답)";
           }
 
-          if (reply) {
-            history.push(
-              { role: "user", content: text },
-              { role: "assistant", content: reply }
-            );
+          if (data.d1) {
+            ai.bubble.insertBefore(renderLoaded(data.d1), ai.bubble.firstChild);
+          }
+
+          var turn = null;
+          if (reply || query) {
+            turn = { role: "assistant", content: reply };
+            history.push({ role: "user", content: text }, turn);
+          }
+
+          if (query) {
+            ai.bubble.appendChild(renderAction(query, data.action, selectedRole, turn));
           }
 
           var meta = document.createElement("div");
           meta.className = "meta";
           meta.textContent =
-            ((performance.now() - started) / 1000).toFixed(1) + "초" +
-            (data.complaint_submitted ? " · 민원 접수됨" : "") +
-            (data.complaint_answered ? " · 민원 답변 등록됨" : "") +
-            (data.complaint_flagged ? " · 부적절 판정됨" : "") +
-            (data.complaint_unflagged ? " · 부적절 판정 해제됨" : "");
+            ((performance.now() - started) / 1000).toFixed(1) + "초";
 
           ai.bubble.appendChild(meta);
 
