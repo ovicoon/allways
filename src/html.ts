@@ -736,6 +736,8 @@ export const HTML = `<!doctype html>
 
       var role = null;
       var busy = false;
+      // 현재 대화의 이전 질문/답변. 매 요청에 함께 보내 모델이 맥락을 기억하게 한다 (새 대화/역할 변경 시 초기화)
+      var history = [];
 
       function autosize() {
         input.style.height = "24px";
@@ -816,6 +818,7 @@ export const HTML = `<!doctype html>
             },
             body: JSON.stringify({
               prompt: text,
+              history: history,
               system: selectedRole.system,
               // 데모이므로 고른 역할을 그대로 보낸다 (서버는 "school" 일 때만 민원 답변 등록 허용)
               role: selectedRole.key
@@ -846,6 +849,13 @@ export const HTML = `<!doctype html>
 
           ai.bubble.textContent = reply || "(빈 응답)";
 
+          if (reply) {
+            history.push(
+              { role: "user", content: text },
+              { role: "assistant", content: reply }
+            );
+          }
+
           var meta = document.createElement("div");
           meta.className = "meta";
           meta.textContent =
@@ -874,6 +884,7 @@ export const HTML = `<!doctype html>
         });
 
         app.classList.remove("chatting");
+        history = [];
         input.value = "";
         autosize();
         thread.scrollTop = 0;

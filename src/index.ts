@@ -19,6 +19,11 @@ const COMPLAINT_LIMIT = 100;
 // Main Model 최대 출력 토큰. Workers AI 기본값(256)은 gpt-oss 가 reasoning 에 다 써버려 답변(content)이 null 이 된다
 const MAIN_MAX_TOKENS = 4096;
 
+// 모델에 넘길 이전 대화 상한 (프롬프트 길이 제한). Retriever 는 최근 질문 맥락만 보면 되므로 더 적게 넘긴다
+const HISTORY_LIMIT = 20;
+const RETRIEVER_HISTORY_LIMIT = 4;
+const HISTORY_CONTENT_LIMIT = 4000;
+
 interface ComplaintRow {
   id: number;
   content: string;
@@ -108,6 +113,32 @@ async function executeAnswer(env: Env, query: string): Promise<boolean> {
   return result.meta.changes > 0;
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// 프론트엔드가 보낸 이전 대화를 모델에 넘길 수 있는 형태로 정리한다.
+// qwen3 와 gpt-oss 모두 messages 의 content 는 일반 문자열이어야 하므로 모델별 부가 정보는 제거한다:
+// - qwen3 의 <think>...</think> 블록 (이전 턴의 reasoning 을 다시 넣으면 안 됨)
+// - >>>EXECUTE SQL: 표시 (다시 넣으면 같은 민원을 또 접수/답변할 수 있음)
+function sanitizeHistory(raw: unknown, limit: number): ChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  const messages = raw
+    .filter((m: any) => (m?.role === 'user' || m?.role === 'assistant') && typeof m.content === 'string')
+    .map((m: any): ChatMessage => {
+      let content: string = m.content.replace(/<think>[\s\S]*?<\/think>/g, '');
+      const marker = content.lastIndexOf(EXECUTE_MARKER);
+      if (marker !== -1) content = content.slice(0, marker);
+      return { role: m.role, content: content.trim().slice(0, HISTORY_CONTENT_LIMIT) };
+    })
+    .filter((m) => m.content);
+  // 최근 대화만 남기고, user 로 시작하도록 맞춘다
+  const recent = messages.slice(-limit);
+  while (recent.length && recent[0].role !== 'user') recent.shift();
+  return recent;
+}
+
 const ALLOWED_PATHS = new Set(['/api/worker-ai']);
 
 function json(data: unknown, status = 200): Response {
@@ -123,6 +154,7 @@ interface ProxyOptions {
   max_tokens?: number;
   instruction?: string;
   skill?: string;
+  history?: ChatMessage[];
   useClientbody?: boolean;
 }
 
@@ -169,6 +201,10 @@ async function proxyToBackend(
 
   if (options.max_tokens !== undefined) {
     payload.max_tokens = options.max_tokens;
+  }
+
+  if (options.history && options.history.length > 0) {
+    payload.history = options.history;
   }
 
   if (systemPrompts.length > 0) {
@@ -218,11 +254,13 @@ export default {
         return json({ error: 'Method not allowed. Use POST method.' }, 405);
       }
       try {
+        const clientBody: any = await request.clone().json().catch(() => ({}));
+        // 이어지는 질문("그거 접수해줘" 등)도 맞는 스킬을 고를 수 있도록 Retriever 에도 최근 대화를 넘긴다
         const retrieved = await proxyToBackend(request.clone(), env, path, RETRIEVER, {
           instruction: RETRIEVER_INSTRUCTION,
+          history: sanitizeHistory(clientBody.history, RETRIEVER_HISTORY_LIMIT),
           useClientbody: false
         });
-        const clientBody: any = await request.clone().json().catch(() => ({}));
         const isAdmin = clientBody.role === ANSWER_ROLE;
         const key = await parseSkillKey(retrieved);
         let skill: string | undefined = key && SKILLS[key].content;
@@ -231,7 +269,11 @@ export default {
         if (key === 'COMPLAINTS') {
           skill = `${isAdmin ? COMPLAINTS_ADMIN : skill}\n${await loadComplaints(env)}`;
         }
-        const res = await proxyToBackend(request, env, path, MAIN_MODEL, { skill, max_tokens: MAIN_MAX_TOKENS });
+        const res = await proxyToBackend(request, env, path, MAIN_MODEL, {
+          skill,
+          history: sanitizeHistory(clientBody.history, HISTORY_LIMIT),
+          max_tokens: MAIN_MAX_TOKENS
+        });
         if (!res.ok) return res;
         const data: any = await res.json().catch(() => null);
         if (!data) return json({ error: 'Invalid upstream response' }, 502);
