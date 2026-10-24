@@ -16,6 +16,9 @@ export interface Env {
 // Main Model 에 넘길 기존 민원 개수 상한 (프롬프트 길이 제한)
 const COMPLAINT_LIMIT = 100;
 
+// Main Model 최대 출력 토큰. Workers AI 기본값(256)은 gpt-oss 가 reasoning 에 다 써버려 답변(content)이 null 이 된다
+const MAIN_MAX_TOKENS = 4096;
+
 interface ComplaintRow {
   id: number;
   content: string;
@@ -46,6 +49,30 @@ const ALLOWED_UPDATE = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*'((?:[^']|'')+
 
 // 민원 답변 등록 권한이 있는 역할. 데모이므로 프론트엔드에서 고른 역할을 그대로 믿고 검증하지 않는다.
 const ANSWER_ROLE = 'school';
+
+// 모델별로 다른 응답 형식에서 답변 텍스트를 꺼낸다. 못 찾으면 undefined.
+// - qwen 등: { response: "..." }
+// - gpt-oss (Responses API): { output: [{ type: 'reasoning', ... }, { type: 'message', content: [{ type: 'output_text', text }] }] }
+// - Chat Completions: { choices: [{ message: { content } }] }
+function extractText(data: any): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  if (typeof data.response === 'string') return data.response;
+  if (typeof data.output_text === 'string') return data.output_text;
+  if (Array.isArray(data.output)) {
+    // reasoning 블록은 제외하고 message 의 output_text 만 사용
+    const text = data.output
+      .filter((item: any) => item?.type === 'message')
+      .flatMap((item: any) => (Array.isArray(item.content) ? item.content : []))
+      .filter((part: any) => part?.type === 'output_text' && typeof part.text === 'string')
+      .map((part: any) => part.text)
+      .join('');
+    if (text) return text;
+  }
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content;
+  if (data.result) return extractText(data.result);
+  return undefined;
+}
 
 // 답변 끝의 >>>EXECUTE SQL: ... 표시에서 쿼리 부분을 꺼낸다. 없으면 undefined.
 function extractQuery(answer: string): string | undefined {
@@ -93,6 +120,7 @@ function json(data: unknown, status = 200): Response {
 interface ProxyOptions {
   temperature?: number;
   top_p?: number;
+  max_tokens?: number;
   instruction?: string;
   skill?: string;
   useClientbody?: boolean;
@@ -105,7 +133,7 @@ async function parseSkillKey(res: Response): Promise<SkillKey | undefined> {
   let text = raw;
   try {
     const data: any = JSON.parse(raw);
-    text = data?.response ?? data?.result?.response ?? data?.text ?? raw;
+    text = extractText(data) ?? data?.text ?? raw;
   } catch {}
   // qwen3 의 <think>...</think> 블록은 제외하고 탐색
   const answer = String(text).replace(/<think>[\s\S]*?<\/think>/g, '');
@@ -138,6 +166,10 @@ async function proxyToBackend(
     prompt: clientBody.prompt ?? clientBody.question,
     model: model,
   };
+
+  if (options.max_tokens !== undefined) {
+    payload.max_tokens = options.max_tokens;
+  }
 
   if (systemPrompts.length > 0) {
     payload.system = systemPrompts.join('\n\n');
@@ -199,13 +231,21 @@ export default {
         if (key === 'COMPLAINTS') {
           skill = `${isAdmin ? COMPLAINTS_ADMIN : skill}\n${await loadComplaints(env)}`;
         }
-        const res = await proxyToBackend(request, env, path, MAIN_MODEL, { skill });
-        // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인해 실행한다 (표시는 프론트엔드에서 숨김)
-        if (key !== 'COMPLAINTS' || !res.ok) return res;
+        const res = await proxyToBackend(request, env, path, MAIN_MODEL, { skill, max_tokens: MAIN_MAX_TOKENS });
+        if (!res.ok) return res;
         const data: any = await res.json().catch(() => null);
         if (!data) return json({ error: 'Invalid upstream response' }, 502);
-        const answer = data?.response ?? data?.result?.response;
-        const query = typeof answer === 'string' ? extractQuery(answer) : undefined;
+        // 프론트엔드는 data.response 만 읽으므로, 모델별 응답 형식을 response 텍스트로 맞춘다
+        const answer = extractText(data);
+        if (answer === undefined) {
+          // finish_reason 이 length 이면 reasoning 에 토큰을 다 써서 답변이 잘린 것
+          const truncated = data.choices?.[0]?.finish_reason === 'length';
+          return json({ error: truncated ? 'Model response truncated (max_tokens exceeded)' : 'Empty model response' }, 502);
+        }
+        data.response = answer;
+        // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인해 실행한다 (표시는 프론트엔드에서 숨김)
+        if (key !== 'COMPLAINTS') return json(data);
+        const query = extractQuery(answer);
         if (query) {
           // 학교 관련자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
           if (isAdmin) {
