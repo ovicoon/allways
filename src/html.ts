@@ -305,6 +305,13 @@ export const HTML = `<!doctype html>
       display: none;
     }
 
+    /* 역할 선택 후 첫 화면에서 눈을 깜빡이는 캐릭터 */
+
+    .hero-character {
+      --w: 96px;
+      margin: 0 0 20px;
+    }
+
     .hero-label {
       margin: 0 0 22px;
       color: var(--muted);
@@ -703,6 +710,10 @@ export const HTML = `<!doctype html>
         font-size: 37px;
       }
 
+      .hero-character {
+        --w: 80px;
+      }
+
       .hero p {
         font-size: 13px;
       }
@@ -796,6 +807,9 @@ export const HTML = `<!doctype html>
     <main id="thread" aria-label="대화 내용" aria-live="polite">
       <div class="thread-inner" id="list">
         <section class="hero">
+          <span class="character hero-character" aria-hidden="true">
+            <img id="heroCharacter" src="/Allways%20character/default.png" alt="" />
+          </span>
           <p class="hero-label">ALLWAYS</p>
           <h2>함께 이해하고<br />명확하게 소통하세요.</h2>
           <p id="heroText"></p>
@@ -883,6 +897,14 @@ export const HTML = `<!doctype html>
       var thinkingImg = null;
       var framesPreloaded = false;
 
+      // 첫 화면 캐릭터 눈 깜빡임. 간격은 BLINK_INTERVAL_MS + (0 ~ BLINK_OFFSET_MS)
+      var CHARACTER_BLINK = CHARACTER_DIR + "closed%20eyes/1.png";
+      var BLINK_CLOSED_MS = 140;
+      var BLINK_INTERVAL_MS = 4000;
+      var BLINK_OFFSET_MS = 800;
+      var blinkTimer = null;
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
       var role = null;
       var busy = false;
       // 현재 대화의 이전 질문/답변. 매 요청에 함께 보내 모델이 맥락을 기억하게 한다 (새 대화/역할 변경 시 초기화)
@@ -949,9 +971,46 @@ export const HTML = `<!doctype html>
         }
 
         framesPreloaded = true;
-        THINKING_FRAMES.forEach(function (src) {
+        THINKING_FRAMES.concat(CHARACTER_BLINK).forEach(function (src) {
           new Image().src = src;
         });
+      }
+
+      function startBlinking() {
+        var img = $("heroCharacter");
+
+        stopBlinking();
+
+        if (reduceMotion.matches) {
+          return;
+        }
+
+        function schedule() {
+          blinkTimer = setTimeout(
+            blink,
+            BLINK_INTERVAL_MS + Math.random() * BLINK_OFFSET_MS
+          );
+        }
+
+        function blink() {
+          img.src = CHARACTER_BLINK;
+
+          blinkTimer = setTimeout(function () {
+            img.src = CHARACTER_DEFAULT;
+            schedule();
+          }, BLINK_CLOSED_MS);
+        }
+
+        schedule();
+      }
+
+      function stopBlinking() {
+        if (blinkTimer) {
+          clearTimeout(blinkTimer);
+          blinkTimer = null;
+        }
+
+        $("heroCharacter").src = CHARACTER_DEFAULT;
       }
 
       // 지금 생성 중인 답변의 프로필 사진(img)만 thinking 프레임으로 돌린다
@@ -1126,6 +1185,7 @@ export const HTML = `<!doctype html>
         clearChat();
 
         app.classList.add("has-role");
+        startBlinking();
         input.focus();
       }
 
@@ -1161,6 +1221,7 @@ export const HTML = `<!doctype html>
         }
 
         clearChat();
+        stopBlinking();
         role = null;
         app.classList.remove("has-role");
       });
