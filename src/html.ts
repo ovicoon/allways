@@ -3,14 +3,14 @@ export const HTML = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#000000" />
   <title>Allways</title>
   <link rel="icon" type="image/svg+xml" href="/allways.svg" />
 
   <style>
     :root {
       color-scheme: dark;
-      --bg: #111111;
+      --bg: #000000;
       --surface: #181818;
       --surface-hover: #222222;
       --surface-input: #151515;
@@ -97,13 +97,41 @@ export const HTML = `<!doctype html>
       text-decoration: none;
     }
 
-    .brand img {
+    .brand .logo {
       display: block;
       width: auto;
       height: 48px;
       max-width: min(280px, 58vw);
       object-fit: contain;
       object-position: left center;
+    }
+
+    /* Allways 캐릭터 (1024px 이미지의 여백을 잘라 가운데 캐릭터만 보이게 한다) */
+
+    .character {
+      --w: 64px;
+      position: relative;
+      display: block;
+      flex: none;
+      width: var(--w);
+      height: calc(var(--w) * 0.75);
+      overflow: hidden;
+    }
+
+    .character img {
+      position: absolute;
+      top: calc(var(--w) * -0.40625);
+      left: calc(var(--w) * -0.5);
+      width: calc(var(--w) * 2);
+      height: calc(var(--w) * 2);
+      max-width: none;
+      image-rendering: pixelated;
+    }
+
+    /* AI 말풍선마다 붙는 프로필 사진 */
+
+    .avatar {
+      --w: 48px;
     }
 
     .header-actions {
@@ -318,6 +346,8 @@ export const HTML = `<!doctype html>
 
     .msg.ai {
       justify-content: flex-start;
+      align-items: flex-start;
+      gap: 12px;
     }
 
     .bubble {
@@ -340,7 +370,9 @@ export const HTML = `<!doctype html>
     }
 
     .msg.ai .bubble {
+      flex: 1;
       max-width: 100%;
+      padding-top: 2px;
     }
 
     .msg.ai.error .bubble {
@@ -471,6 +503,7 @@ export const HTML = `<!doctype html>
       align-items: center;
       gap: 5px;
       height: 28px;
+      margin-left: 6px;
     }
 
     .typing i {
@@ -617,9 +650,17 @@ export const HTML = `<!doctype html>
         padding: 16px 20px;
       }
 
-      .brand img {
+      .brand .logo {
         height: 40px;
         max-width: 58vw;
+      }
+
+      .avatar {
+        --w: 40px;
+      }
+
+      .msg.ai {
+        gap: 8px;
       }
 
       .header-actions {
@@ -705,7 +746,7 @@ export const HTML = `<!doctype html>
 
     <header>
       <a class="brand" href="/" aria-label="Allways 홈">
-        <img src="/allways.svg" alt="Allways" />
+        <img class="logo" src="/allways.svg" alt="Allways" />
       </a>
 
       <div class="header-actions">
@@ -831,6 +872,17 @@ export const HTML = `<!doctype html>
         }
       };
 
+      // AI 말풍선 프로필 사진으로 쓰는 Allways 캐릭터. thinking 애니메이션은 파일명 번호 순서가 프레임 순서
+      var CHARACTER_DIR = "/Allways%20character/";
+      var CHARACTER_DEFAULT = CHARACTER_DIR + "default.png";
+      var THINKING_FRAMES = [1, 2, 3, 4, 5].map(function (n) {
+        return CHARACTER_DIR + "thinking/" + n + ".png";
+      });
+      var THINKING_FRAME_MS = 180;
+      var thinkingTimer = null;
+      var thinkingImg = null;
+      var framesPreloaded = false;
+
       var role = null;
       var busy = false;
       // 현재 대화의 이전 질문/답변. 매 요청에 함께 보내 모델이 맥락을 기억하게 한다 (새 대화/역할 변경 시 초기화)
@@ -865,14 +917,69 @@ export const HTML = `<!doctype html>
           bubble.textContent = text;
         }
 
+        var avatarImg = null;
+
+        if (type === "ai") {
+          var avatar = document.createElement("span");
+          avatar.className = "character avatar";
+          avatar.setAttribute("aria-hidden", "true");
+
+          avatarImg = document.createElement("img");
+          avatarImg.src = CHARACTER_DEFAULT;
+          avatarImg.alt = "";
+          avatar.appendChild(avatarImg);
+          row.appendChild(avatar);
+        }
+
         row.appendChild(bubble);
         list.appendChild(row);
         scrollDown();
 
         return {
           row: row,
-          bubble: bubble
+          bubble: bubble,
+          avatar: avatarImg
         };
+      }
+
+      // 프레임 전환 때 깜빡이지 않도록 미리 불러 둔다
+      function preloadFrames() {
+        if (framesPreloaded) {
+          return;
+        }
+
+        framesPreloaded = true;
+        THINKING_FRAMES.forEach(function (src) {
+          new Image().src = src;
+        });
+      }
+
+      // 지금 생성 중인 답변의 프로필 사진(img)만 thinking 프레임으로 돌린다
+      function startThinking(img) {
+        var frame = 0;
+
+        stopThinking();
+        thinkingImg = img;
+
+        function show() {
+          img.src = THINKING_FRAMES[frame];
+          frame = (frame + 1) % THINKING_FRAMES.length;
+        }
+
+        show();
+        thinkingTimer = setInterval(show, THINKING_FRAME_MS);
+      }
+
+      function stopThinking() {
+        if (thinkingTimer) {
+          clearInterval(thinkingTimer);
+          thinkingTimer = null;
+        }
+
+        if (thinkingImg) {
+          thinkingImg.src = CHARACTER_DEFAULT;
+          thinkingImg = null;
+        }
       }
 
       // AI 답변만 Markdown 으로 렌더링한다. 라이브러리를 못 불러오면 일반 텍스트로 표시
@@ -914,6 +1021,7 @@ export const HTML = `<!doctype html>
         }
 
         ai.bubble.appendChild(typing);
+        startThinking(ai.avatar);
 
         var started = performance.now();
 
@@ -984,6 +1092,7 @@ export const HTML = `<!doctype html>
             (err.message || "잠시 후 다시 시도해 주세요.");
 
         } finally {
+          stopThinking();
           busy = false;
           autosize();
           scrollDown();
@@ -1012,6 +1121,7 @@ export const HTML = `<!doctype html>
 
         $("roleBadge").textContent = role.label + " · 변경";
         $("heroText").textContent = role.intro;
+        preloadFrames();
 
         clearChat();
 
