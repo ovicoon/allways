@@ -632,41 +632,21 @@ export const HTML = `<!doctype html>
         <h1 id="pickerTitle">참여할 교육 공동체를 선택하세요</h1>
 
         <div class="roles">
-          <button class="role" type="button" data-role="teacher">
+          <button class="role" type="button" data-role="school">
             <span class="role-copy">
-              <strong>교사</strong>
+              <strong>학교 관련자</strong>
               <span class="role-description">
-                교육 활동, 수업 운영, 자료 작성 및 업무 지원
+                교육 활동, 학교 행정 업무, 민원 확인 및 답변 등록
               </span>
             </span>
             <span class="role-arrow" aria-hidden="true">→</span>
           </button>
 
-          <button class="role" type="button" data-role="student">
+          <button class="role" type="button" data-role="family">
             <span class="role-copy">
-              <strong>학생</strong>
+              <strong>학생 및 학부모</strong>
               <span class="role-description">
-                학교생활 이해, 교육 활동 안내, 의견 전달
-              </span>
-            </span>
-            <span class="role-arrow" aria-hidden="true">→</span>
-          </button>
-
-          <button class="role" type="button" data-role="parent">
-            <span class="role-copy">
-              <strong>학부모</strong>
-              <span class="role-description">
-                학교생활 소통, 가정 연계 교육, 교육 활동 안내 및 의견 전달
-              </span>
-            </span>
-            <span class="role-arrow" aria-hidden="true">→</span>
-          </button>
-
-          <button class="role" type="button" data-role="admin">
-            <span class="role-copy">
-              <strong>행정실 관계자</strong>
-              <span class="role-description">
-                학교 행정 업무, 예산 집행, 시설 관리 및 학교 운영 지원
+                학교생활 이해, 교육 활동 안내, 의견 및 민원 전달
               </span>
             </span>
             <span class="role-arrow" aria-hidden="true">→</span>
@@ -737,36 +717,20 @@ export const HTML = `<!doctype html>
       var form = $("form");
 
       var ROLES = {
-        teacher: {
-          label: "교사",
+        school: {
+          label: "학교 관련자",
           intro:
-            "교육 활동과 수업 운영, 자료 작성 등 학교 업무에 필요한 내용을 함께 정리해 보세요.",
+            "교육 활동과 학교 행정 업무를 정리하고, 접수된 민원을 확인해 답변을 등록해 보세요.",
           system:
-            "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 교사의 관점에서 교육 활동, 수업 운영, 자료 작성, 학교 업무를 지원합니다. 질문의 맥락을 파악하고 명확하고 실용적인 한국어로 답변하세요. 예산 관련 질문은 필요한 경우에만 다루며, 근거가 없는 수치나 규정을 만들어 내지 마세요."
+            "당신은 학교 구성원 간의 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 교직원 등 학교 관련자의 관점에서 교육 활동, 수업 운영, 자료 작성, 학교 행정 업무, 예산 집행, 시설 관리 및 민원 답변 업무를 지원합니다. 명확하고 실용적인 한국어로 답변하며, 근거가 없는 규정이나 수치를 만들어 내지 마세요."
         },
 
-        student: {
-          label: "학생",
+        family: {
+          label: "학생 및 학부모",
           intro:
-            "학교생활과 교육 활동에 관해 궁금한 점을 알아보고, 생각과 의견을 정리해 보세요.",
+            "학교생활과 교육 활동에 관해 궁금한 점을 알아보고, 의견이나 민원을 전달해 보세요.",
           system:
-            "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 도우미입니다. 학생이 학교생활, 교육 활동, 학교 운영과 관련된 내용을 이해하고 자신의 의견을 명확하게 표현하도록 지원합니다. 학생의 눈높이에 맞춰 쉽고 정확한 한국어로 답변하세요. 질문과 관련이 없는 주제를 억지로 연결하지 마세요."
-        },
-
-        parent: {
-          label: "학부모",
-          intro:
-            "학교생활 소통과 가정 연계 교육, 교육 활동 안내에 관해 궁금한 점을 확인해 보세요.",
-          system:
-            "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 도우미입니다. 학부모의 관점에서 학교생활 소통, 가정 연계 교육, 교육 활동 안내 및 의견 전달을 지원합니다. 친절하고 명확한 한국어로 답변하며, 근거가 없는 규정이나 사실을 만들어 내지 마세요."
-        },
-
-        admin: {
-          label: "행정실 관계자",
-          intro:
-            "학교 행정 업무, 예산 집행, 시설 관리 등 행정 지원 내용에 관해 확인해 보세요.",
-          system:
-            "당신은 학교 구성원 간의 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 행정실 관계자의 관점에서 학교 행정 업무, 예산 집행, 시설 관리, 계약 및 일반 행정 지원을 돕습니다. 명확하고 실용적인 한국어로 답변하며, 근거가 없는 규정이나 수치를 만들어 내지 마세요."
+            "당신은 학교 구성원 간의 소통을 돕는 Allways의 AI 도우미입니다. 학생과 학부모가 학교생활, 교육 활동, 가정 연계 교육, 학교 운영과 관련된 내용을 이해하고 자신의 의견을 명확하게 전달하도록 지원합니다. 학생도 이해할 수 있도록 쉽고 친절하며 정확한 한국어로 답변하고, 근거가 없는 규정이나 사실을 만들어 내지 마세요."
         }
       };
 
@@ -853,7 +817,7 @@ export const HTML = `<!doctype html>
             body: JSON.stringify({
               prompt: text,
               system: selectedRole.system,
-              // 데모이므로 고른 역할을 그대로 보낸다 (서버는 "admin" 일 때만 민원 답변 등록 허용)
+              // 데모이므로 고른 역할을 그대로 보낸다 (서버는 "school" 일 때만 민원 답변 등록 허용)
               role: selectedRole.key
             })
           });

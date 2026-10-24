@@ -41,11 +41,11 @@ const EXECUTE_MARKER = '>>>EXECUTE SQL:';
 // 허용하는 유일한 쿼리 형태: complaints 에 content 한 건 INSERT (POST). 그 외 SELECT/UPDATE/DELETE 등은 모두 거부
 const ALLOWED_INSERT = /^INSERT\s+INTO\s+complaints\s*\(\s*content\s*\)\s*VALUES\s*\(\s*'((?:[^']|'')+)'\s*\)\s*;?$/i;
 
-// 행정실 관계자만 허용하는 쿼리 형태: 기존 민원 한 건의 answer UPDATE
+// 학교 관련자만 허용하는 쿼리 형태: 기존 민원 한 건의 answer UPDATE
 const ALLOWED_UPDATE = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*'((?:[^']|'')+)'\s+WHERE\s+id\s*=\s*(\d+)\s*;?$/i;
 
 // 민원 답변 등록 권한이 있는 역할. 데모이므로 프론트엔드에서 고른 역할을 그대로 믿고 검증하지 않는다.
-const ANSWER_ROLE = 'admin';
+const ANSWER_ROLE = 'school';
 
 // 답변 끝의 >>>EXECUTE SQL: ... 표시에서 쿼리 부분을 꺼낸다. 없으면 undefined.
 function extractQuery(answer: string): string | undefined {
@@ -195,7 +195,7 @@ export default {
         const key = await parseSkillKey(retrieved);
         let skill: string | undefined = key && SKILLS[key].content;
         // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
-        // 행정실 관계자는 민원 접수 대신 답변 등록용 지침을 사용
+        // 학교 관련자는 민원 접수 대신 답변 등록용 지침을 사용
         if (key === 'COMPLAINTS') {
           skill = `${isAdmin ? COMPLAINTS_ADMIN : skill}\n${await loadComplaints(env)}`;
         }
@@ -207,7 +207,7 @@ export default {
         const answer = data?.response ?? data?.result?.response;
         const query = typeof answer === 'string' ? extractQuery(answer) : undefined;
         if (query) {
-          // 행정실 관계자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
+          // 학교 관련자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
           if (isAdmin) {
             data.complaint_answered = await executeAnswer(env, query);
           } else {
