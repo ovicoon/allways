@@ -1,6 +1,6 @@
 import { HTML } from './html';
-import { REGULATION } from './reference';
-import { MAIN_MODEL } from './constant';
+import { REFERENCES, type ReferenceKey } from './reference';
+import { MAIN_MODEL, RETRIEVER, RETRIEVER_INSTRUCTION } from './constant';
 
 export interface Env {
   // 백엔드 Worker에 대한 Service Binding (권장: 같은 계정 내 Worker 간 직접 호출)
@@ -24,7 +24,22 @@ interface ProxyOptions {
   temperature?: number;
   top_p?: number;
   instruction?: string;
+  reference?: string;
   useClientbody?: boolean;
+}
+
+// Retriever 응답(JSON 또는 일반 텍스트)에서 reference key 를 찾는다. 없거나 NONE 이면 undefined.
+async function parseReferenceKey(res: Response): Promise<ReferenceKey | undefined> {
+  if (!res.ok) return undefined;
+  const raw = await res.text();
+  let text = raw;
+  try {
+    const data: any = JSON.parse(raw);
+    text = data?.response ?? data?.result?.response ?? data?.text ?? raw;
+  } catch {}
+  // qwen3 의 <think>...</think> 블록은 제외하고 탐색
+  const answer = String(text).replace(/<think>[\s\S]*?<\/think>/g, '');
+  return (Object.keys(REFERENCES) as ReferenceKey[]).find((key) => answer.includes(key));
 }
 
 async function proxyToBackend(
@@ -45,7 +60,7 @@ async function proxyToBackend(
   const systemPrompts = [
     options.instruction,
     useClientbody ? clientBody.system : undefined,
-    REGULATION
+    options.reference
   ].filter(Boolean);
   
   // 전송할 페이로드 구성
@@ -101,7 +116,15 @@ export default {
         return json({ error: 'Method not allowed. Use POST method.' }, 405);
       }
       try {
-        return await proxyToBackend(request, env, path, MAIN_MODEL);
+        const retrieved = await proxyToBackend(request.clone(), env, path, RETRIEVER, {
+          instruction: RETRIEVER_INSTRUCTION,
+          useClientbody: false
+        });
+        const key = await parseReferenceKey(retrieved);
+        console.log(key)
+        return await proxyToBackend(request, env, path, MAIN_MODEL, {
+          reference: key && REFERENCES[key].content
+        });
       } catch (error: any) {
         return json({ error: error?.message || 'Upstream request failed' }, 502);
       }
