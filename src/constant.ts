@@ -1,7 +1,7 @@
 import { SKILLS } from './skill';
 
 export const RETRIEVER = '@cf/qwen/qwen3-30b-a3b-fp8'
-export const MAIN_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8'
+export const MAIN_MODEL = '@cf/openai/gpt-oss-120b'
 
 const SKILL_LIST = Object.entries(SKILLS)
   .map(([key, { description }]) => `- ${key}: ${description}`)
