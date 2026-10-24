@@ -576,16 +576,6 @@ export const HTML = `<!doctype html>
       height: 18px;
     }
 
-    .hint {
-      width: 100%;
-      max-width: var(--content-width);
-      margin: 12px auto 0;
-      color: var(--subtle);
-      font-size: 11px;
-      line-height: 1.5;
-      text-align: center;
-    }
-
     .app:not(.chatting) .composer-wrap {
       padding-bottom: calc(28px + env(safe-area-inset-bottom));
     }
@@ -696,11 +686,6 @@ export const HTML = `<!doctype html>
         height: 36px;
         border-radius: 10px;
       }
-
-      .hint {
-        margin-top: 10px;
-        font-size: 10px;
-      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -807,8 +792,6 @@ export const HTML = `<!doctype html>
           </svg>
         </button>
       </form>
-
-      <div class="hint">Enter 전송 · Shift + Enter 줄바꿈</div>
     </div>
 
   </div>
