@@ -347,6 +347,118 @@ export const HTML = `<!doctype html>
       color: #d0d0d0;
     }
 
+    /* Markdown (AI 답변 전용) */
+
+    .bubble.markdown {
+      white-space: normal;
+    }
+
+    .markdown > :first-child {
+      margin-top: 0;
+    }
+
+    .markdown > :last-child {
+      margin-bottom: 0;
+    }
+
+    .markdown p,
+    .markdown ul,
+    .markdown ol,
+    .markdown pre,
+    .markdown table,
+    .markdown blockquote {
+      margin: 0 0 14px;
+    }
+
+    .markdown h1,
+    .markdown h2,
+    .markdown h3,
+    .markdown h4 {
+      margin: 22px 0 10px;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+
+    .markdown h1 { font-size: 1.35em; }
+    .markdown h2 { font-size: 1.2em; }
+    .markdown h3,
+    .markdown h4 { font-size: 1.05em; }
+
+    .markdown ul,
+    .markdown ol {
+      padding-left: 22px;
+    }
+
+    .markdown li + li {
+      margin-top: 4px;
+    }
+
+    .markdown strong {
+      font-weight: 600;
+    }
+
+    .markdown a {
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .markdown code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--surface-hover);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.88em;
+    }
+
+    .markdown pre {
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+
+    .markdown pre code {
+      padding: 0;
+      background: none;
+      white-space: pre;
+    }
+
+    .markdown blockquote {
+      padding-left: 14px;
+      border-left: 3px solid var(--border);
+      color: var(--muted);
+    }
+
+    .markdown table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      border-collapse: collapse;
+      font-size: 0.93em;
+      line-height: 1.6;
+    }
+
+    .markdown th,
+    .markdown td {
+      padding: 7px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .markdown th {
+      background: var(--surface);
+      font-weight: 600;
+    }
+
+    .markdown hr {
+      margin: 20px 0;
+      border: 0;
+      border-top: 1px solid var(--border);
+    }
+
     .meta {
       margin-top: 12px;
       color: var(--subtle);
@@ -701,6 +813,8 @@ export const HTML = `<!doctype html>
 
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <script>
     (function () {
       "use strict";
@@ -778,6 +892,16 @@ export const HTML = `<!doctype html>
         };
       }
 
+      // AI 답변만 Markdown 으로 렌더링한다. 라이브러리를 못 불러오면 일반 텍스트로 표시
+      function renderMarkdown(el, text) {
+        if (window.marked && window.DOMPurify) {
+          el.innerHTML = DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }));
+          el.classList.add("markdown");
+        } else {
+          el.textContent = text;
+        }
+      }
+
       async function ask(rawText) {
         var text = String(rawText || "").trim();
 
@@ -847,7 +971,11 @@ export const HTML = `<!doctype html>
             reply = reply.slice(0, marker).trim();
           }
 
-          ai.bubble.textContent = reply || "(빈 응답)";
+          if (reply) {
+            renderMarkdown(ai.bubble, reply);
+          } else {
+            ai.bubble.textContent = "(빈 응답)";
+          }
 
           if (reply) {
             history.push(
@@ -867,6 +995,7 @@ export const HTML = `<!doctype html>
 
         } catch (err) {
           ai.row.classList.add("error");
+          ai.bubble.classList.remove("markdown");
           ai.bubble.textContent =
             "요청을 처리하지 못했습니다. " +
             (err.message || "잠시 후 다시 시도해 주세요.");
