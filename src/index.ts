@@ -121,7 +121,6 @@ export default {
           useClientbody: false
         });
         const key = await parseReferenceKey(retrieved);
-        console.log(key)
         return await proxyToBackend(request, env, path, MAIN_MODEL, {
           reference: key && REFERENCES[key].content
         });
