@@ -1,5 +1,5 @@
 import { HTML } from './html';
-import { SKILLS, type SkillKey } from './skill';
+import { SKILLS, COMPLAINTS_ADMIN, type SkillKey } from './skill';
 import { MAIN_MODEL, RETRIEVER, RETRIEVER_INSTRUCTION } from './constant';
 
 export interface Env {
@@ -37,18 +37,28 @@ async function loadComplaints(env: Env): Promise<string> {
 }
 
 // Main Model 이 민원 접수가 필요하다고 판단하면 답변 끝에 붙이는 표시
-const EXECUTE_MARKER = '<EXECUTE:';
+const EXECUTE_MARKER = '>>>EXECUTE SQL:';
 // 허용하는 유일한 쿼리 형태: complaints 에 content 한 건 INSERT (POST). 그 외 SELECT/UPDATE/DELETE 등은 모두 거부
 const ALLOWED_INSERT = /^INSERT\s+INTO\s+complaints\s*\(\s*content\s*\)\s*VALUES\s*\(\s*'((?:[^']|'')+)'\s*\)\s*;?$/i;
 
-// 답변에서 <EXECUTE: ...> 표시를 찾아 허용된 INSERT 이면 실행한다. 실행 여부를 반환.
-async function executeComplaint(env: Env, answer: string): Promise<boolean> {
+// 행정실 관계자만 허용하는 쿼리 형태: 기존 민원 한 건의 answer UPDATE
+const ALLOWED_UPDATE = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*'((?:[^']|'')+)'\s+WHERE\s+id\s*=\s*(\d+)\s*;?$/i;
+
+// 민원 답변 등록 권한이 있는 역할. 데모이므로 프론트엔드에서 고른 역할을 그대로 믿고 검증하지 않는다.
+const ANSWER_ROLE = 'admin';
+
+// 답변 끝의 >>>EXECUTE SQL: ... 표시에서 쿼리 부분을 꺼낸다. 없으면 undefined.
+function extractQuery(answer: string): string | undefined {
   // qwen3 의 <think>...</think> 블록 안의 표시는 무시
   const text = answer.replace(/<think>[\s\S]*?<\/think>/g, '');
   const start = text.lastIndexOf(EXECUTE_MARKER);
-  const end = text.lastIndexOf('>');
-  if (start === -1 || end < start) return false;
-  const query = text.slice(start + EXECUTE_MARKER.length, end).trim();
+  if (start === -1) return undefined;
+  // 표시 뒤의 나머지 전체가 쿼리
+  return text.slice(start + EXECUTE_MARKER.length).trim();
+}
+
+// 허용된 INSERT 이면 민원을 접수한다. 실행 여부를 반환.
+async function executeComplaint(env: Env, query: string): Promise<boolean> {
   const match = ALLOWED_INSERT.exec(query);
   if (!match) return false;
   const content = match[1].replace(/''/g, "'").trim();
@@ -56,6 +66,19 @@ async function executeComplaint(env: Env, answer: string): Promise<boolean> {
   // 모델이 만든 SQL 을 그대로 실행하지 않고, 내용만 뽑아 prepared statement 로 바인딩
   await env.DB.prepare('INSERT INTO complaints (content) VALUES (?)').bind(content).run();
   return true;
+}
+
+// 허용된 UPDATE 이면 민원에 답변을 등록한다. 실제로 갱신된 민원이 있으면 true.
+async function executeAnswer(env: Env, query: string): Promise<boolean> {
+  const match = ALLOWED_UPDATE.exec(query);
+  if (!match) return false;
+  const answer = match[1].replace(/''/g, "'").trim();
+  if (!answer) return false;
+  const result = await env.DB
+    .prepare('UPDATE complaints SET answer = ? WHERE id = ?')
+    .bind(answer, Number(match[2]))
+    .run();
+  return result.meta.changes > 0;
 }
 
 const ALLOWED_PATHS = new Set(['/api/worker-ai']);
@@ -167,20 +190,29 @@ export default {
           instruction: RETRIEVER_INSTRUCTION,
           useClientbody: false
         });
+        const clientBody: any = await request.clone().json().catch(() => ({}));
+        const isAdmin = clientBody.role === ANSWER_ROLE;
         const key = await parseSkillKey(retrieved);
         let skill: string | undefined = key && SKILLS[key].content;
         // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
+        // 행정실 관계자는 민원 접수 대신 답변 등록용 지침을 사용
         if (key === 'COMPLAINTS') {
-          skill = `${skill}\n${await loadComplaints(env)}`;
+          skill = `${isAdmin ? COMPLAINTS_ADMIN : skill}\n${await loadComplaints(env)}`;
         }
         const res = await proxyToBackend(request, env, path, MAIN_MODEL, { skill });
-        // 민원 스킬일 때만 답변 속 <EXECUTE: ...> 를 확인해 민원을 접수한다 (표시는 프론트엔드에서 숨김)
+        // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인해 실행한다 (표시는 프론트엔드에서 숨김)
         if (key !== 'COMPLAINTS' || !res.ok) return res;
         const data: any = await res.json().catch(() => null);
         if (!data) return json({ error: 'Invalid upstream response' }, 502);
         const answer = data?.response ?? data?.result?.response;
-        if (typeof answer === 'string') {
-          data.complaint_submitted = await executeComplaint(env, answer);
+        const query = typeof answer === 'string' ? extractQuery(answer) : undefined;
+        if (query) {
+          // 행정실 관계자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
+          if (isAdmin) {
+            data.complaint_answered = await executeAnswer(env, query);
+          } else {
+            data.complaint_submitted = await executeComplaint(env, query);
+          }
         }
         return json(data);
       } catch (error: any) {

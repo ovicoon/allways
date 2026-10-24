@@ -870,7 +870,9 @@ export const HTML = `<!doctype html>
             },
             body: JSON.stringify({
               prompt: text,
-              system: selectedRole.system
+              system: selectedRole.system,
+              // 데모이므로 고른 역할을 그대로 보낸다 (서버는 "admin" 일 때만 민원 답변 등록 허용)
+              role: selectedRole.key
             })
           });
 
@@ -890,8 +892,8 @@ export const HTML = `<!doctype html>
               ? String(data.response)
               : JSON.stringify(data, null, 2);
 
-          // 민원 접수용 <EXECUTE: ...> 표시는 사용자에게 보여주지 않는다
-          var marker = reply.indexOf("<EXECUTE:");
+          // 민원 접수용 >>>EXECUTE SQL: 표시는 답변 맨 끝에 오므로, 표시부터 끝까지 잘라낸다
+          var marker = reply.lastIndexOf(">>>EXECUTE SQL:");
           if (marker !== -1) {
             reply = reply.slice(0, marker).trim();
           }
@@ -902,7 +904,8 @@ export const HTML = `<!doctype html>
           meta.className = "meta";
           meta.textContent =
             ((performance.now() - started) / 1000).toFixed(1) + "초" +
-            (data.complaint_submitted ? " · 민원 접수됨" : "");
+            (data.complaint_submitted ? " · 민원 접수됨" : "") +
+            (data.complaint_answered ? " · 민원 답변 등록됨" : "");
 
           ai.bubble.appendChild(meta);
 
@@ -936,6 +939,7 @@ export const HTML = `<!doctype html>
         }
 
         role = ROLES[key];
+        role.key = key;
 
         $("roleBadge").textContent = role.label + " · 변경";
         $("heroText").textContent = role.intro;
