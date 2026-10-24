@@ -43,13 +43,47 @@ async function loadComplaints(env: Env): Promise<{ text: string; query: string; 
   };
 }
 
+// 모델에게 보여주는 시각의 기준 시간대. 학교가 한국에 있으므로 한국 시간으로 통일한다
+const LOCAL_TIME_ZONE = 'Asia/Seoul';
+const LOCAL_TIME_LABEL = '한국 시간';
+
+const LOCAL_FORMAT = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: LOCAL_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23'
+});
+
+// Date 를 "2026-10-24(토) 23:07" 형태의 한국 시간 문자열로 만든다
+function formatLocal(date: Date): string {
+  const parts = Object.fromEntries(LOCAL_FORMAT.formatToParts(date).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}(${parts.weekday}) ${parts.hour}:${parts.minute}`;
+}
+
+// D1 의 CURRENT_TIMESTAMP 는 시간대 표시 없는 UTC("2026-10-24 14:07:39")이므로 UTC 로 읽어 한국 시간으로 바꾼다.
+// 형식이 달라 읽지 못하면 원래 값을 그대로 쓴다.
+function utcToLocal(utc: string): string {
+  const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(utc) ? utc : `${utc.replace(' ', 'T')}Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? utc : formatLocal(date);
+}
+
 // 기존 민원과 답변을 instruction 에 붙일 텍스트로 만든다.
+// 같은 민원인지 날짜로 판단할 수 있도록 현재 시각과 접수 시각을 모두 한국 시간으로 넣는다.
 function formatComplaints(results: ComplaintRow[]): string {
-  if (results.length === 0) return '[기존 민원 목록]\n(접수된 민원 없음)';
+  const now = `[현재 시각]\n${formatLocal(new Date())} (${LOCAL_TIME_LABEL})`;
+  if (results.length === 0) return `${now}\n\n[기존 민원 목록]\n(접수된 민원 없음)`;
   const list = results
-    .map((row) => `- 민원 #${row.id} (${row.created_at})\n  내용: ${row.content}\n  답변: ${row.answer ?? '(답변 대기 중)'}`)
+    .map(
+      (row) =>
+        `- 민원 #${row.id} (접수: ${utcToLocal(row.created_at)})\n  내용: ${row.content}\n  답변: ${row.answer ?? '(답변 대기 중)'}`
+    )
     .join('\n');
-  return `[기존 민원 목록]\n${list}`;
+  return `${now}\n\n[기존 민원 목록] (접수 시각은 ${LOCAL_TIME_LABEL})\n${list}`;
 }
 
 // Main Model 이 민원 접수가 필요하다고 판단하면 답변 끝에 붙이는 표시
