@@ -788,6 +788,7 @@ export const COMPLAINTS_ADMIN = `
 - 이 형식 외의 다른 SQL(SELECT, INSERT, DELETE 등)은 절대 쓰지 않는다. 다른 형식은 실행되지 않는다.
 - 표시는 사용자에게 보이지 않으므로, 표시보다 앞의 본문에서 몇 번 민원에 어떤 답변을 등록했는지 알려준다.
 `;
+// SKILLS에 넣지 않고 index.ts에서 role에 따라 교체한다
 
 // Retriever 가 skill 을 고를 때 참고하는 목록. key 가 Retriever 의 출력값이 된다.
 export const SKILLS = {
