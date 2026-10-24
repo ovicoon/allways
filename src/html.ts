@@ -309,7 +309,23 @@ export const HTML = `<!doctype html>
 
     .hero-character {
       --w: 96px;
+      --look-x: 0;
+      --look-y: 0;
       margin: 0 0 20px;
+    }
+
+    /* 눈 레이어. --look-x/y 는 캐릭터 도트 1칸(var(--w) / 16) 단위 */
+
+    .hero-character .eyes {
+      transform: translate(
+        calc(var(--look-x) * var(--w) / 16),
+        calc(var(--look-y) * var(--w) / 16)
+      );
+      transition: transform 120ms ease-out;
+    }
+
+    .hero-character.blinking .eyes {
+      visibility: hidden;
     }
 
     .hero-label {
@@ -807,8 +823,9 @@ export const HTML = `<!doctype html>
     <main id="thread" aria-label="대화 내용" aria-live="polite">
       <div class="thread-inner" id="list">
         <section class="hero">
-          <span class="character hero-character" aria-hidden="true">
-            <img id="heroCharacter" src="/Allways%20character/default.png" alt="" />
+          <span class="character hero-character" id="heroCharacter" aria-hidden="true">
+            <img src="/Allways%20character/closed%20eyes/1.png" alt="" />
+            <img class="eyes" src="/Allways%20character/eyes/1.png" alt="" />
           </span>
           <p class="hero-label">ALLWAYS</p>
           <h2>함께 이해하고<br />명확하게 소통하세요.</h2>
@@ -897,13 +914,18 @@ export const HTML = `<!doctype html>
       var thinkingImg = null;
       var framesPreloaded = false;
 
-      // 첫 화면 캐릭터 눈 깜빡임. 간격은 BLINK_INTERVAL_MS + (0 ~ BLINK_OFFSET_MS)
-      var CHARACTER_BLINK = CHARACTER_DIR + "closed%20eyes/1.png";
+      // 첫 화면 캐릭터 눈 깜빡임 (눈 레이어를 잠깐 숨김). 간격은 BLINK_INTERVAL_MS + (0 ~ BLINK_OFFSET_MS)
       var BLINK_CLOSED_MS = 140;
       var BLINK_INTERVAL_MS = 4000;
       var BLINK_OFFSET_MS = 800;
       var blinkTimer = null;
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      // 눈이 마우스 쪽을 바라본다. 멀수록 더 쏠리지만 LOOK_MAX_X/Y(도트 칸 수)를 넘지 않는다
+      var LOOK_MAX_X = 1;
+      var LOOK_MAX_Y = 0.75;
+      var LOOK_REACH_PX = 320;
+      var lookFrame = null;
 
       var role = null;
       var busy = false;
@@ -971,13 +993,13 @@ export const HTML = `<!doctype html>
         }
 
         framesPreloaded = true;
-        THINKING_FRAMES.concat(CHARACTER_BLINK).forEach(function (src) {
+        THINKING_FRAMES.forEach(function (src) {
           new Image().src = src;
         });
       }
 
       function startBlinking() {
-        var img = $("heroCharacter");
+        var character = $("heroCharacter");
 
         stopBlinking();
 
@@ -993,10 +1015,10 @@ export const HTML = `<!doctype html>
         }
 
         function blink() {
-          img.src = CHARACTER_BLINK;
+          character.classList.add("blinking");
 
           blinkTimer = setTimeout(function () {
-            img.src = CHARACTER_DEFAULT;
+            character.classList.remove("blinking");
             schedule();
           }, BLINK_CLOSED_MS);
         }
@@ -1010,7 +1032,42 @@ export const HTML = `<!doctype html>
           blinkTimer = null;
         }
 
-        $("heroCharacter").src = CHARACTER_DEFAULT;
+        $("heroCharacter").classList.remove("blinking");
+      }
+
+      // 포인터 위치를 받아 눈 위치를 정한다. 거리에 따라 tanh 로 완만하게 한계까지 쏠림
+      // 포인터가 창 밖으로 나가도 마지막 위치를 그대로 바라본다
+      function lookAt(x, y) {
+        var character = $("heroCharacter");
+        var lookX = 0;
+        var lookY = 0;
+
+        if (!reduceMotion.matches) {
+          var rect = character.getBoundingClientRect();
+          var dx = x - (rect.left + rect.width / 2);
+          var dy = y - (rect.top + rect.height / 2);
+          var dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist > 0) {
+            var pull = Math.tanh(dist / LOOK_REACH_PX);
+            lookX = (dx / dist) * pull * LOOK_MAX_X;
+            lookY = (dy / dist) * pull * LOOK_MAX_Y;
+          }
+        }
+
+        character.style.setProperty("--look-x", lookX.toFixed(3));
+        character.style.setProperty("--look-y", lookY.toFixed(3));
+      }
+
+      function queueLook(x, y) {
+        if (lookFrame) {
+          cancelAnimationFrame(lookFrame);
+        }
+
+        lookFrame = requestAnimationFrame(function () {
+          lookFrame = null;
+          lookAt(x, y);
+        });
       }
 
       // 지금 생성 중인 답변의 프로필 사진(img)만 thinking 프레임으로 돌린다
@@ -1188,6 +1245,10 @@ export const HTML = `<!doctype html>
         startBlinking();
         input.focus();
       }
+
+      window.addEventListener("pointermove", function (e) {
+        queueLook(e.clientX, e.clientY);
+      });
 
       input.addEventListener("input", autosize);
 
