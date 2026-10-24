@@ -13,11 +13,13 @@
     { "binding": "BACKEND", "service": "ai-api-hub", "remote": true }
   ],
 
+  // "remote": true → wrangler dev 에서도 로컬 D1 이 아닌 원격(프로덕션) D1 에 연결
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "allways",
-      "database_id": "e56c46c4-04de-4698-9abe-511117f4d9ff"
+      "database_id": "e56c46c4-04de-4698-9abe-511117f4d9ff",
+      "remote": true
     }
   ]
 }

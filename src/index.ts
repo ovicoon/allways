@@ -9,6 +9,31 @@ export interface Env {
   BACKEND_URL?: string;
   // 백엔드의 BACKEND_API_KEY 와 동일한 값 (wrangler secret 으로 등록)
   BACKEND_API_KEY: string;
+  // 기존 민원(complaints 테이블)이 저장된 D1 데이터베이스
+  DB: D1Database;
+}
+
+// Main Model 에 넘길 기존 민원 개수 상한 (프롬프트 길이 제한)
+const COMPLAINT_LIMIT = 100;
+
+interface ComplaintRow {
+  id: number;
+  content: string;
+  answer: string | null;
+  created_at: string;
+}
+
+// D1 에서 기존 민원과 답변을 읽어 instruction 에 붙일 텍스트로 만든다.
+async function loadComplaints(env: Env): Promise<string> {
+  const { results } = await env.DB
+    .prepare('SELECT id, content, answer, created_at FROM complaints ORDER BY created_at DESC LIMIT ?')
+    .bind(COMPLAINT_LIMIT)
+    .all<ComplaintRow>();
+  if (results.length === 0) return '[기존 민원 목록]\n(접수된 민원 없음)';
+  const list = results
+    .map((row) => `- 민원 #${row.id} (${row.created_at})\n  내용: ${row.content}\n  답변: ${row.answer ?? '(답변 대기 중)'}`)
+    .join('\n');
+  return `[기존 민원 목록]\n${list}`;
 }
 
 const ALLOWED_PATHS = new Set(['/api/worker-ai']);
@@ -121,9 +146,12 @@ export default {
           useClientbody: false
         });
         const key = await parseSkillKey(retrieved);
-        return await proxyToBackend(request, env, path, MAIN_MODEL, {
-          skill: key && SKILLS[key].content
-        });
+        let skill: string | undefined = key && SKILLS[key].content;
+        // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
+        if (key === 'COMPLAINTS') {
+          skill = `${skill}\n${await loadComplaints(env)}`;
+        }
+        return await proxyToBackend(request, env, path, MAIN_MODEL, { skill });
       } catch (error: any) {
         return json({ error: error?.message || 'Upstream request failed' }, 502);
       }
