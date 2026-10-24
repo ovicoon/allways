@@ -158,9 +158,9 @@ interface ProxyOptions {
   useClientbody?: boolean;
 }
 
-// Retriever 응답(JSON 또는 일반 텍스트)에서 skill key 를 찾는다. 없거나 NONE 이면 undefined.
-async function parseSkillKey(res: Response): Promise<SkillKey | undefined> {
-  if (!res.ok) return undefined;
+// Retriever 응답(JSON 또는 일반 텍스트)에서 skill key 들을 모두 찾는다. 없거나 NONE 이면 빈 배열.
+async function parseSkillKeys(res: Response): Promise<SkillKey[]> {
+  if (!res.ok) return [];
   const raw = await res.text();
   let text = raw;
   try {
@@ -169,7 +169,7 @@ async function parseSkillKey(res: Response): Promise<SkillKey | undefined> {
   } catch {}
   // qwen3 의 <think>...</think> 블록은 제외하고 탐색
   const answer = String(text).replace(/<think>[\s\S]*?<\/think>/g, '');
-  return (Object.keys(SKILLS) as SkillKey[]).find((key) => answer.includes(key));
+  return (Object.keys(SKILLS) as SkillKey[]).filter((key) => new RegExp(`\\b${key}\\b`).test(answer));
 }
 
 async function proxyToBackend(
@@ -262,15 +262,20 @@ export default {
           useClientbody: false
         });
         const isAdmin = clientBody.role === ANSWER_ROLE;
-        const key = await parseSkillKey(retrieved);
-        let skill: string | undefined = key && SKILLS[key].content;
-        // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
-        // 학교 관련자는 민원 접수 대신 답변 등록용 지침을 사용
-        if (key === 'COMPLAINTS') {
-          skill = `${isAdmin ? COMPLAINTS_ADMIN : skill}\n${await loadComplaints(env)}`;
-        }
+        const keys = await parseSkillKeys(retrieved);
+        const hasComplaints = keys.includes('COMPLAINTS');
+        const skills = await Promise.all(
+          keys.map(async (key) => {
+            // 민원 스킬이면 기존 민원 목록을 D1 에서 읽어 스킬 지침 뒤에 추가
+            // 학교 관련자는 민원 접수 대신 답변 등록용 지침을 사용
+            if (key === 'COMPLAINTS') {
+              return `${isAdmin ? COMPLAINTS_ADMIN : SKILLS[key].content}\n${await loadComplaints(env)}`;
+            }
+            return SKILLS[key].content;
+          })
+        );
         const res = await proxyToBackend(request, env, path, MAIN_MODEL, {
-          skill,
+          skill: skills.length > 0 ? skills.join('\n\n') : undefined,
           history: sanitizeHistory(clientBody.history, HISTORY_LIMIT),
           max_tokens: MAIN_MAX_TOKENS
         });
@@ -286,7 +291,7 @@ export default {
         }
         data.response = answer;
         // 민원 스킬일 때만 답변 끝의 >>>EXECUTE SQL: ... 를 확인해 실행한다 (표시는 프론트엔드에서 숨김)
-        if (key !== 'COMPLAINTS') return json(data);
+        if (!hasComplaints) return json(data);
         const query = extractQuery(answer);
         if (query) {
           // 학교 관련자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용

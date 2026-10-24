@@ -7,12 +7,16 @@ const SKILL_LIST = Object.entries(SKILLS)
   .map(([key, { description }]) => `- ${key}: ${description}`)
   .join('\n')
 
-export const RETRIEVER_INSTRUCTION = `You are a retriever. Pick the single skill that is needed to answer the user's question.
+export const RETRIEVER_INSTRUCTION = `You are a retriever. Pick every skill that is needed to answer the user's question.
 
 SKILLS:
 ${SKILL_LIST}
 
+Rules:
+- Pick all skills that are needed. More than one skill may be needed at the same time.
+- If a complaint is related to the school regulations, pick both COMPLAINTS and REGULATION.
+
 Output format:
-- Output exactly one skill name from the list above, and nothing else.
-- Do not add explanations, quotes, punctuation, or extra words.
+- Output the skill names from the list above separated by commas (e.g. COMPLAINTS,REGULATION), and nothing else.
+- Do not add explanations, quotes, or extra words.
 - If no skill is relevant, output NONE.`

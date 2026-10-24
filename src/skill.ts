@@ -795,7 +795,7 @@ export const COMPLAINTS_ADMIN = `
 export const SKILLS = {
   REGULATION: {
     description:
-      '문수중학교 학교생활규정을 다뤘다.',
+      '문수중학교 학교생활규정(교칙)을 다뤘다. 교칙 내용을 묻는 질문에 사용한다. 민원이 학교 교칙(두발·복장, 휴대전화, 징계, 상벌점, 교내 생활 등)과 관련되어 있을 때는 COMPLAINTS 와 함께 반드시 로드한다.',
     content: REGULATION
   },
   COMPLAINTS: {
