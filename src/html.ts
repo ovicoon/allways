@@ -85,9 +85,9 @@ export const HTML = `<!doctype html>
       gap: 20px;
       width: 100%;
       max-width: 1040px;
-      min-height: 104px;
+      min-height: 80px;
       margin: 0 auto;
-      padding: 24px 32px;
+      padding: 16px 32px;
     }
 
     .brand {
@@ -100,7 +100,7 @@ export const HTML = `<!doctype html>
     .brand img {
       display: block;
       width: auto;
-      height: 54px;
+      height: 48px;
       max-width: min(280px, 58vw);
       object-fit: contain;
       object-position: left center;
@@ -147,7 +147,7 @@ export const HTML = `<!doctype html>
       align-items: center;
       justify-content: center;
       overflow-y: auto;
-      padding: 32px 24px 64px;
+      padding: 16px 24px 32px;
     }
 
     .picker-inner {
@@ -157,7 +157,7 @@ export const HTML = `<!doctype html>
     }
 
     .eyebrow {
-      margin: 0 0 24px;
+      margin: 0 0 12px;
       color: var(--muted);
       font-size: 11px;
       font-weight: 500;
@@ -166,20 +166,13 @@ export const HTML = `<!doctype html>
     }
 
     .picker h1 {
-      margin: 0;
-      font-size: clamp(36px, 5vw, 54px);
-      line-height: 1.25;
+      margin: 0 0 28px;
+      font-size: clamp(22px, 3.5vw, 30px);
+      line-height: 1.3;
       font-weight: 600;
-      letter-spacing: -0.065em;
+      letter-spacing: -0.04em;
       word-break: keep-all;
-    }
-
-    .picker-description {
-      margin: 20px 0 48px;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.9;
-      word-break: keep-all;
+      color: var(--text);
     }
 
     .roles {
@@ -194,8 +187,8 @@ export const HTML = `<!doctype html>
       justify-content: space-between;
       gap: 24px;
       width: 100%;
-      min-height: 92px;
-      padding: 20px 6px;
+      min-height: 80px;
+      padding: 16px 6px;
       border: 0;
       border-bottom: 1px solid var(--border);
       border-radius: 0;
@@ -214,12 +207,12 @@ export const HTML = `<!doctype html>
     .role-copy {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
     }
 
     .role strong {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 500;
       letter-spacing: -0.025em;
     }
@@ -228,7 +221,7 @@ export const HTML = `<!doctype html>
       color: var(--muted);
       font-size: 13px;
       font-weight: 400;
-      line-height: 1.7;
+      line-height: 1.6;
       word-break: keep-all;
     }
 
@@ -518,12 +511,12 @@ export const HTML = `<!doctype html>
 
     @media (max-width: 600px) {
       header {
-        min-height: 84px;
-        padding: 18px 20px;
+        min-height: 72px;
+        padding: 16px 20px;
       }
 
       .brand img {
-        height: 44px;
+        height: 40px;
         max-width: 58vw;
       }
 
@@ -537,25 +530,21 @@ export const HTML = `<!doctype html>
 
       .picker {
         align-items: flex-start;
-        padding: 52px 24px 44px;
+        padding: 24px 20px 32px;
       }
 
       .picker h1 {
-        font-size: 38px;
-      }
-
-      .picker-description {
-        margin: 16px 0 36px;
-        font-size: 14px;
+        margin-bottom: 20px;
+        font-size: 20px;
       }
 
       .role {
-        min-height: 84px;
-        padding: 18px 2px;
+        min-height: 72px;
+        padding: 14px 2px;
       }
 
       .role strong {
-        font-size: 15px;
+        font-size: 14px;
       }
 
       .role-description {
@@ -640,13 +629,7 @@ export const HTML = `<!doctype html>
     <section class="picker" aria-labelledby="pickerTitle">
       <div class="picker-inner">
         <p class="eyebrow">ALLWAYS</p>
-
-        <h1 id="pickerTitle">서로 이해하고<br />함께 소통합니다.</h1>
-
-        <p class="picker-description">
-          교사와 학생, 교육청을 연결하고<br />
-          교육 현장의 다양한 업무를 지원합니다.
-        </p>
+        <h1 id="pickerTitle">참여할 교육 공동체를 선택하세요</h1>
 
         <div class="roles">
           <button class="role" type="button" data-role="teacher">
@@ -664,6 +647,16 @@ export const HTML = `<!doctype html>
               <strong>학생</strong>
               <span class="role-description">
                 학교생활 이해, 교육 활동 안내, 의견 전달
+              </span>
+            </span>
+            <span class="role-arrow" aria-hidden="true">→</span>
+          </button>
+
+          <button class="role" type="button" data-role="parent">
+            <span class="role-copy">
+              <strong>학부모</strong>
+              <span class="role-description">
+                학교생활 소통, 가정 연계 교육, 교육 활동 안내 및 의견 전달
               </span>
             </span>
             <span class="role-arrow" aria-hidden="true">→</span>
@@ -758,6 +751,14 @@ export const HTML = `<!doctype html>
             "학교생활과 교육 활동에 관해 궁금한 점을 알아보고, 생각과 의견을 정리해 보세요.",
           system:
             "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 도우미입니다. 학생이 학교생활, 교육 활동, 학교 운영과 관련된 내용을 이해하고 자신의 의견을 명확하게 표현하도록 지원합니다. 학생의 눈높이에 맞춰 쉽고 정확한 한국어로 답변하세요. 질문과 관련이 없는 주제를 억지로 연결하지 마세요."
+        },
+
+        parent: {
+          label: "학부모",
+          intro:
+            "학교생활 소통과 가정 연계 교육, 교육 활동 안내에 관해 궁금한 점을 확인해 보세요.",
+          system:
+            "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 도우미입니다. 학부모의 관점에서 학교생활 소통, 가정 연계 교육, 교육 활동 안내 및 의견 전달을 지원합니다. 친절하고 명확한 한국어로 답변하며, 근거가 없는 규정이나 사실을 만들어 내지 마세요."
         },
 
         office: {
