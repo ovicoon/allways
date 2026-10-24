@@ -166,7 +166,7 @@ export const HTML = `<!doctype html>
     }
 
     .picker h1 {
-      margin: 0 0 28px;
+      margin: 0 0 24px;
       font-size: clamp(22px, 3.5vw, 30px);
       line-height: 1.3;
       font-weight: 600;
@@ -187,8 +187,8 @@ export const HTML = `<!doctype html>
       justify-content: space-between;
       gap: 24px;
       width: 100%;
-      min-height: 80px;
-      padding: 16px 6px;
+      min-height: 74px;
+      padding: 14px 6px;
       border: 0;
       border-bottom: 1px solid var(--border);
       border-radius: 0;
@@ -207,7 +207,7 @@ export const HTML = `<!doctype html>
     .role-copy {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       min-width: 0;
     }
 
@@ -219,9 +219,9 @@ export const HTML = `<!doctype html>
 
     .role-description {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 400;
-      line-height: 1.6;
+      line-height: 1.5;
       word-break: keep-all;
     }
 
@@ -530,17 +530,17 @@ export const HTML = `<!doctype html>
 
       .picker {
         align-items: flex-start;
-        padding: 24px 20px 32px;
+        padding: 20px 20px 28px;
       }
 
       .picker h1 {
-        margin-bottom: 20px;
+        margin-bottom: 18px;
         font-size: 20px;
       }
 
       .role {
-        min-height: 72px;
-        padding: 14px 2px;
+        min-height: 66px;
+        padding: 12px 2px;
       }
 
       .role strong {
@@ -548,7 +548,7 @@ export const HTML = `<!doctype html>
       }
 
       .role-description {
-        font-size: 12px;
+        font-size: 11px;
       }
 
       .thread-inner {
@@ -662,6 +662,16 @@ export const HTML = `<!doctype html>
             <span class="role-arrow" aria-hidden="true">→</span>
           </button>
 
+          <button class="role" type="button" data-role="admin">
+            <span class="role-copy">
+              <strong>행정실 관계자</strong>
+              <span class="role-description">
+                학교 행정 업무, 예산 집행, 시설 관리 및 학교 운영 지원
+              </span>
+            </span>
+            <span class="role-arrow" aria-hidden="true">→</span>
+          </button>
+
           <button class="role" type="button" data-role="office">
             <span class="role-copy">
               <strong>교육청 관계자</strong>
@@ -759,6 +769,14 @@ export const HTML = `<!doctype html>
             "학교생활 소통과 가정 연계 교육, 교육 활동 안내에 관해 궁금한 점을 확인해 보세요.",
           system:
             "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 도우미입니다. 학부모의 관점에서 학교생활 소통, 가정 연계 교육, 교육 활동 안내 및 의견 전달을 지원합니다. 친절하고 명확한 한국어로 답변하며, 근거가 없는 규정이나 사실을 만들어 내지 마세요."
+        },
+
+        admin: {
+          label: "행정실 관계자",
+          intro:
+            "학교 행정 업무, 예산 집행, 시설 관리 등 행정 지원 내용에 관해 확인해 보세요.",
+          system:
+            "당신은 학교 구성원 간의 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 행정실 관계자의 관점에서 학교 행정 업무, 예산 집행, 시설 관리, 계약 및 일반 행정 지원을 돕습니다. 명확하고 실용적인 한국어로 답변하며, 근거가 없는 규정이나 수치를 만들어 내지 마세요."
         },
 
         office: {
