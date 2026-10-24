@@ -226,7 +226,6 @@ async function proxyToBackend(
 
   const systemPrompts = [
     options.instruction,
-    useClientbody ? clientBody.system : undefined,
     options.skill
   ].filter(Boolean);
   
