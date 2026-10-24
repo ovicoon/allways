@@ -593,7 +593,7 @@ export const HTML = `<!doctype html>
       font-size: 14px;
       line-height: 20px;
       font-family: inherit;
-      box-sizing: content-box;
+      box-sizing: border-box;
     }
 
     .composer textarea::placeholder {
@@ -1196,7 +1196,9 @@ export const HTML = `<!doctype html>
           meta.textContent =
             ((performance.now() - started) / 1000).toFixed(1) + "초" +
             (data.complaint_submitted ? " · 민원 접수됨" : "") +
-            (data.complaint_answered ? " · 민원 답변 등록됨" : "");
+            (data.complaint_answered ? " · 민원 답변 등록됨" : "") +
+            (data.complaint_flagged ? " · 부적절 판정됨" : "") +
+            (data.complaint_unflagged ? " · 부적절 판정 해제됨" : "");
 
           ai.bubble.appendChild(meta);
 

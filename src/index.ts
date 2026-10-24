@@ -28,18 +28,24 @@ interface ComplaintRow {
   id: number;
   content: string;
   answer: string | null;
+  // D1 은 boolean 을 0/1 로 저장한다. 1 이면 학교가 부적절하다고 판정한 민원이며 answer 에 그 사유가 적혀 있다
+  inappropriate: number | null;
   created_at: string;
 }
 
 // D1 에서 기존 민원과 답변을 읽어 instruction 에 붙일 텍스트로 만든다.
 async function loadComplaints(env: Env): Promise<string> {
   const { results } = await env.DB
-    .prepare('SELECT id, content, answer, created_at FROM complaints ORDER BY created_at DESC LIMIT ?')
+    .prepare('SELECT id, content, answer, inappropriate, created_at FROM complaints ORDER BY created_at DESC LIMIT ?')
     .bind(COMPLAINT_LIMIT)
     .all<ComplaintRow>();
   if (results.length === 0) return '[기존 민원 목록]\n(접수된 민원 없음)';
   const list = results
-    .map((row) => `- 민원 #${row.id} (${row.created_at})\n  내용: ${row.content}\n  답변: ${row.answer ?? '(답변 대기 중)'}`)
+    .map((row) =>
+      row.inappropriate === 1
+        ? `- 민원 #${row.id} (${row.created_at}) [부적절 판정]\n  내용: ${row.content}\n  부적절 사유: ${row.answer ?? '(사유 미기재)'}`
+        : `- 민원 #${row.id} (${row.created_at})\n  내용: ${row.content}\n  답변: ${row.answer ?? '(답변 대기 중)'}`
+    )
     .join('\n');
   return `[기존 민원 목록]\n${list}`;
 }
@@ -51,6 +57,12 @@ const ALLOWED_INSERT = /^INSERT\s+INTO\s+complaints\s*\(\s*content\s*\)\s*VALUES
 
 // 학교 관련자만 허용하는 쿼리 형태: 기존 민원 한 건의 answer UPDATE
 const ALLOWED_UPDATE = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*'((?:[^']|'')+)'\s+WHERE\s+id\s*=\s*(\d+)\s*;?$/i;
+
+// 학교 관련자만 허용하는 쿼리 형태: 기존 민원 한 건을 부적절 판정 (answer 에 사유 기록)
+const ALLOWED_FLAG = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*'((?:[^']|'')+)'\s*,\s*inappropriate\s*=\s*1\s+WHERE\s+id\s*=\s*(\d+)\s*;?$/i;
+
+// 학교 관련자만 허용하는 쿼리 형태: 부적절 판정 되돌리기. 사유가 답변으로 보이지 않도록 answer 를 비워 답변 대기 상태로 돌린다
+const ALLOWED_UNFLAG = /^UPDATE\s+complaints\s+SET\s+answer\s*=\s*NULL\s*,\s*inappropriate\s*=\s*0\s+WHERE\s+id\s*=\s*(\d+)\s*;?$/i;
 
 // 민원 답변 등록 권한이 있는 역할. 데모이므로 프론트엔드에서 고른 역할을 그대로 믿고 검증하지 않는다.
 const ANSWER_ROLE = 'school';
@@ -109,6 +121,31 @@ async function executeAnswer(env: Env, query: string): Promise<boolean> {
   const result = await env.DB
     .prepare('UPDATE complaints SET answer = ? WHERE id = ?')
     .bind(answer, Number(match[2]))
+    .run();
+  return result.meta.changes > 0;
+}
+
+// 허용된 부적절 판정 UPDATE 이면 민원을 부적절로 표시하고 사유를 기록한다. 실제로 갱신된 민원이 있으면 true.
+async function executeFlag(env: Env, query: string): Promise<boolean> {
+  const match = ALLOWED_FLAG.exec(query);
+  if (!match) return false;
+  const reason = match[1].replace(/''/g, "'").trim();
+  if (!reason) return false;
+  const result = await env.DB
+    .prepare('UPDATE complaints SET answer = ?, inappropriate = 1 WHERE id = ?')
+    .bind(reason, Number(match[2]))
+    .run();
+  return result.meta.changes > 0;
+}
+
+// 허용된 판정 되돌리기 UPDATE 이면 부적절 판정된 민원만 답변 대기 상태로 돌린다. 실제로 갱신된 민원이 있으면 true.
+async function executeUnflag(env: Env, query: string): Promise<boolean> {
+  const match = ALLOWED_UNFLAG.exec(query);
+  if (!match) return false;
+  // 정상 민원의 답변을 지우지 않도록 inappropriate = 1 인 민원만 대상으로 한다
+  const result = await env.DB
+    .prepare('UPDATE complaints SET answer = NULL, inappropriate = 0 WHERE id = ? AND inappropriate = 1')
+    .bind(Number(match[1]))
     .run();
   return result.meta.changes > 0;
 }
@@ -294,9 +331,11 @@ export default {
         if (!hasComplaints) return json(data);
         const query = extractQuery(answer);
         if (query) {
-          // 학교 관련자는 답변 등록(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
+          // 학교 관련자는 답변 등록·부적절 판정·판정 되돌리기(UPDATE)만, 그 외 역할은 민원 접수(INSERT)만 허용
           if (isAdmin) {
             data.complaint_answered = await executeAnswer(env, query);
+            data.complaint_flagged = await executeFlag(env, query);
+            data.complaint_unflagged = await executeUnflag(env, query);
           } else {
             data.complaint_submitted = await executeComplaint(env, query);
           }
