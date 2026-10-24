@@ -890,12 +890,19 @@ export const HTML = `<!doctype html>
               ? String(data.response)
               : JSON.stringify(data, null, 2);
 
+          // 민원 접수용 <EXECUTE: ...> 표시는 사용자에게 보여주지 않는다
+          var marker = reply.indexOf("<EXECUTE:");
+          if (marker !== -1) {
+            reply = reply.slice(0, marker).trim();
+          }
+
           ai.bubble.textContent = reply || "(빈 응답)";
 
           var meta = document.createElement("div");
           meta.className = "meta";
           meta.textContent =
-            ((performance.now() - started) / 1000).toFixed(1) + "초";
+            ((performance.now() - started) / 1000).toFixed(1) + "초" +
+            (data.complaint_submitted ? " · 민원 접수됨" : "");
 
           ai.bubble.appendChild(meta);
 

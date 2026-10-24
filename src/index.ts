@@ -36,6 +36,28 @@ async function loadComplaints(env: Env): Promise<string> {
   return `[기존 민원 목록]\n${list}`;
 }
 
+// Main Model 이 민원 접수가 필요하다고 판단하면 답변 끝에 붙이는 표시
+const EXECUTE_MARKER = '<EXECUTE:';
+// 허용하는 유일한 쿼리 형태: complaints 에 content 한 건 INSERT (POST). 그 외 SELECT/UPDATE/DELETE 등은 모두 거부
+const ALLOWED_INSERT = /^INSERT\s+INTO\s+complaints\s*\(\s*content\s*\)\s*VALUES\s*\(\s*'((?:[^']|'')+)'\s*\)\s*;?$/i;
+
+// 답변에서 <EXECUTE: ...> 표시를 찾아 허용된 INSERT 이면 실행한다. 실행 여부를 반환.
+async function executeComplaint(env: Env, answer: string): Promise<boolean> {
+  // qwen3 의 <think>...</think> 블록 안의 표시는 무시
+  const text = answer.replace(/<think>[\s\S]*?<\/think>/g, '');
+  const start = text.lastIndexOf(EXECUTE_MARKER);
+  const end = text.lastIndexOf('>');
+  if (start === -1 || end < start) return false;
+  const query = text.slice(start + EXECUTE_MARKER.length, end).trim();
+  const match = ALLOWED_INSERT.exec(query);
+  if (!match) return false;
+  const content = match[1].replace(/''/g, "'").trim();
+  if (!content) return false;
+  // 모델이 만든 SQL 을 그대로 실행하지 않고, 내용만 뽑아 prepared statement 로 바인딩
+  await env.DB.prepare('INSERT INTO complaints (content) VALUES (?)').bind(content).run();
+  return true;
+}
+
 const ALLOWED_PATHS = new Set(['/api/worker-ai']);
 
 function json(data: unknown, status = 200): Response {
@@ -151,7 +173,16 @@ export default {
         if (key === 'COMPLAINTS') {
           skill = `${skill}\n${await loadComplaints(env)}`;
         }
-        return await proxyToBackend(request, env, path, MAIN_MODEL, { skill });
+        const res = await proxyToBackend(request, env, path, MAIN_MODEL, { skill });
+        // 민원 스킬일 때만 답변 속 <EXECUTE: ...> 를 확인해 민원을 접수한다 (표시는 프론트엔드에서 숨김)
+        if (key !== 'COMPLAINTS' || !res.ok) return res;
+        const data: any = await res.json().catch(() => null);
+        if (!data) return json({ error: 'Invalid upstream response' }, 502);
+        const answer = data?.response ?? data?.result?.response;
+        if (typeof answer === 'string') {
+          data.complaint_submitted = await executeComplaint(env, answer);
+        }
+        return json(data);
       } catch (error: any) {
         return json({ error: error?.message || 'Upstream request failed' }, 502);
       }
