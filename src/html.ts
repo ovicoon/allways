@@ -671,16 +671,6 @@ export const HTML = `<!doctype html>
             </span>
             <span class="role-arrow" aria-hidden="true">→</span>
           </button>
-
-          <button class="role" type="button" data-role="office">
-            <span class="role-copy">
-              <strong>교육청 관계자</strong>
-              <span class="role-description">
-                학교 운영 현황, 계획 검토, 예산안 확인 및 업무 지원
-              </span>
-            </span>
-            <span class="role-arrow" aria-hidden="true">→</span>
-          </button>
         </div>
       </div>
     </section>
@@ -777,14 +767,6 @@ export const HTML = `<!doctype html>
             "학교 행정 업무, 예산 집행, 시설 관리 등 행정 지원 내용에 관해 확인해 보세요.",
           system:
             "당신은 학교 구성원 간의 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 행정실 관계자의 관점에서 학교 행정 업무, 예산 집행, 시설 관리, 계약 및 일반 행정 지원을 돕습니다. 명확하고 실용적인 한국어로 답변하며, 근거가 없는 규정이나 수치를 만들어 내지 마세요."
-        },
-
-        office: {
-          label: "교육청 관계자",
-          intro:
-            "학교 현황과 운영 계획을 검토하고, 필요한 업무 자료와 예산안을 확인해 보세요.",
-          system:
-            "당신은 교사, 학생, 교육청 간의 이해와 소통을 돕는 Allways의 AI 업무 지원 도우미입니다. 교육청 관계자의 업무를 지원하며 학교 운영 현황 분석, 계획서 검토, 업무 자료 작성, 예산안 항목과 산출 근거 확인 등을 돕습니다. 예산안을 검토할 때는 제공된 자료를 근거로 항목별 금액, 합계, 산출 근거, 누락 가능성 및 확인이 필요한 사항을 구분하세요. 실제 자료가 제공되지 않았다면 내용을 추정해 사실처럼 말하지 마세요. 관련 규정이나 정책은 확인 가능한 근거를 바탕으로 설명하고 한국어로 답변하세요."
         }
       };
 
