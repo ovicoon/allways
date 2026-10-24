@@ -746,8 +746,8 @@ export const REGULATION = `
 5 담배(전자담배), 라이터 등 흡연용품 5 학습과 관련 없는 장난감(퍼즐 등)
 `;
 
-// Retriever 가 reference 를 고를 때 참고하는 목록. key 가 Retriever 의 출력값이 된다.
-export const REFERENCES = {
+// Retriever 가 skill 을 고를 때 참고하는 목록. key 가 Retriever 의 출력값이 된다.
+export const SKILLS = {
   REGULATION: {
     description:
       '문수중학교 학교생활규정을 다뤘다.',
@@ -755,4 +755,4 @@ export const REFERENCES = {
   }
 } as const;
 
-export type ReferenceKey = keyof typeof REFERENCES;
+export type SkillKey = keyof typeof SKILLS;

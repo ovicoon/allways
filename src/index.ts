@@ -1,5 +1,5 @@
 import { HTML } from './html';
-import { REFERENCES, type ReferenceKey } from './reference';
+import { SKILLS, type SkillKey } from './skill';
 import { MAIN_MODEL, RETRIEVER, RETRIEVER_INSTRUCTION } from './constant';
 
 export interface Env {
@@ -24,12 +24,12 @@ interface ProxyOptions {
   temperature?: number;
   top_p?: number;
   instruction?: string;
-  reference?: string;
+  skill?: string;
   useClientbody?: boolean;
 }
 
-// Retriever 응답(JSON 또는 일반 텍스트)에서 reference key 를 찾는다. 없거나 NONE 이면 undefined.
-async function parseReferenceKey(res: Response): Promise<ReferenceKey | undefined> {
+// Retriever 응답(JSON 또는 일반 텍스트)에서 skill key 를 찾는다. 없거나 NONE 이면 undefined.
+async function parseSkillKey(res: Response): Promise<SkillKey | undefined> {
   if (!res.ok) return undefined;
   const raw = await res.text();
   let text = raw;
@@ -39,7 +39,7 @@ async function parseReferenceKey(res: Response): Promise<ReferenceKey | undefine
   } catch {}
   // qwen3 의 <think>...</think> 블록은 제외하고 탐색
   const answer = String(text).replace(/<think>[\s\S]*?<\/think>/g, '');
-  return (Object.keys(REFERENCES) as ReferenceKey[]).find((key) => answer.includes(key));
+  return (Object.keys(SKILLS) as SkillKey[]).find((key) => answer.includes(key));
 }
 
 async function proxyToBackend(
@@ -60,7 +60,7 @@ async function proxyToBackend(
   const systemPrompts = [
     options.instruction,
     useClientbody ? clientBody.system : undefined,
-    options.reference
+    options.skill
   ].filter(Boolean);
   
   // 전송할 페이로드 구성
@@ -120,9 +120,9 @@ export default {
           instruction: RETRIEVER_INSTRUCTION,
           useClientbody: false
         });
-        const key = await parseReferenceKey(retrieved);
+        const key = await parseSkillKey(retrieved);
         return await proxyToBackend(request, env, path, MAIN_MODEL, {
-          reference: key && REFERENCES[key].content
+          skill: key && SKILLS[key].content
         });
       } catch (error: any) {
         return json({ error: error?.message || 'Upstream request failed' }, 502);

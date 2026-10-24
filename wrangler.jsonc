@@ -11,9 +11,13 @@
   // "remote": true → wrangler dev 에서도 로컬 시뮬레이션이 아닌 배포된 ai-api-hub 에 연결 (deploy 와 동일 동작)
   "services": [
     { "binding": "BACKEND", "service": "ai-api-hub", "remote": true }
-  ]
+  ],
 
-  // 시크릿 (백엔드에 설정된 BACKEND_API_KEY 와 같은 값):
-  //   배포:  npx wrangler secret put BACKEND_API_KEY
-  //   로컬:  .dev.vars 파일에  BACKEND_API_KEY=값
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "allways",
+      "database_id": "e56c46c4-04de-4698-9abe-511117f4d9ff"
+    }
+  ]
 }
